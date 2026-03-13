@@ -10,10 +10,10 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 15px; }
         h2 { text-align: center; color: var(--text-main); font-size: 1.2rem; margin-bottom: 20px; }
         .card { background: var(--box-bg); border-radius: 10px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        .form-group { margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
+        .form-group:last-child { border-bottom: none; padding-bottom: 0; }
         label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
-        input[type="date"], input[type="text"], select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 1rem; box-sizing: border-box; background-color: #fafafa; }
-        .time-select { margin-top: 5px; }
+        input[type="date"], input[type="text"], select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 1rem; box-sizing: border-box; background-color: #fafafa; margin-bottom: 5px;}
         .menu-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; border-left: 3px solid var(--primary-color); padding-left: 10px; }
         .menu-row select { flex: 1; }
         .menu-row .people-select { width: 80px; }
@@ -25,69 +25,73 @@
         .loading { background-color: #fff3cd; color: #856404; }
         .success { background-color: #d4edda; color: #155724; }
         .error { background-color: #f8d7da; color: #721c24; }
-        /* カレンダー用プレースホルダー */
-        .calendar-placeholder { background-color: #e9ecef; border: 1px dashed #adb5bd; padding: 15px; text-align: center; border-radius: 5px; font-size: 0.85rem; color: #6c757d; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
     <div id="status-bar" class="loading">システムを初期化中...</div>
-
     <h2>SkateLab 予約リクエスト</h2>
 
     <form id="reservationForm" style="display: none;">
         
-        <div class="calendar-placeholder" id="calendarArea">
-            📅 現在の空き状況を読み込んでいます...<br>
-            <span style="font-size: 0.7rem;">(※次フェーズで色分けカレンダーが表示されます)</span>
-        </div>
-
         <div class="card">
-            <h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📍 希望日時 (第1〜第3候補)</h3>
+            <h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📍 希望日時と場所</h3>
             
             <div class="form-group">
                 <label>第1候補 (必須)</label>
                 <input type="date" id="date1" required>
-                <select id="time1" class="time-select" required></select>
+                <select id="time1" required></select>
+                <select id="loc1" required onchange="toggleExtraFields(1)">
+                    <option value="">場所を選択してください</option>
+                    <option value="邦和スポーツランド">邦和スポーツランド (Group A)</option>
+                    <option value="ガイシアリーナ">ガイシアリーナ (Group A)</option>
+                    <option value="名古屋スポーツセンター">名古屋スポーツセンター (大須/Group A)</option>
+                    <option value="モリコロパーク">モリコロパーク (Group B)</option>
+                    <option value="中京大学">中京大学 (Group B)</option>
+                    <option value="自宅">自宅（出張）</option>
+                    <option value="その他">その他（自由入力）</option>
+                </select>
+                <input type="text" id="locExtra1" placeholder="住所や場所名を入力" style="display:none;">
             </div>
             
             <div class="form-group">
                 <label>第2候補 (任意)</label>
                 <input type="date" id="date2">
-                <select id="time2" class="time-select"></select>
+                <select id="time2"></select>
+                <select id="loc2" onchange="toggleExtraFields(2)">
+                    <option value="">場所を選択してください</option>
+                    <option value="邦和スポーツランド">邦和スポーツランド (Group A)</option>
+                    <option value="ガイシアリーナ">ガイシアリーナ (Group A)</option>
+                    <option value="名古屋スポーツセンター">名古屋スポーツセンター (大須/Group A)</option>
+                    <option value="モリコロパーク">モリコロパーク (Group B)</option>
+                    <option value="中京大学">中京大学 (Group B)</option>
+                    <option value="自宅">自宅（出張）</option>
+                    <option value="その他">その他（自由入力）</option>
+                </select>
+                <input type="text" id="locExtra2" placeholder="住所や場所名を入力" style="display:none;">
             </div>
 
             <div class="form-group">
                 <label>第3候補 (任意)</label>
                 <input type="date" id="date3">
-                <select id="time3" class="time-select"></select>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">🏢 希望場所</h3>
-            <div class="form-group">
-                <select id="location" required onchange="toggleAddressField()">
+                <select id="time3"></select>
+                <select id="loc3" onchange="toggleExtraFields(3)">
                     <option value="">場所を選択してください</option>
-                    <option value="邦和スポーツランド">邦和スポーツランド </option>
-                    <option value="ガイシアリーナ">ガイシアリーナ </option>
-                    <option value="名古屋スポーツセンター">名古屋スポーツセンター </option>
-                    <option value="モリコロパーク">モリコロパーク </option>
-                    <option value="中京大学">中京大学 </option>
+                    <option value="邦和スポーツランド">邦和スポーツランド (Group A)</option>
+                    <option value="ガイシアリーナ">ガイシアリーナ (Group A)</option>
+                    <option value="名古屋スポーツセンター">名古屋スポーツセンター (大須/Group A)</option>
+                    <option value="モリコロパーク">モリコロパーク (Group B)</option>
+                    <option value="中京大学">中京大学 (Group B)</option>
                     <option value="自宅">自宅（出張）</option>
+                    <option value="その他">その他（自由入力）</option>
                 </select>
-            </div>
-            <div class="form-group" id="addressGroup" style="display: none;">
-                <label>ご自宅の住所</label>
-                <input type="text" id="homeAddress" placeholder="例: 愛知県名古屋市〇〇区...">
-                <div style="font-size: 0.8rem; color: #666; margin-top: 4px;">※過去にご利用がある場合は自動で参照します</div>
+                <input type="text" id="locExtra3" placeholder="住所や場所名を入力" style="display:none;">
             </div>
         </div>
 
         <div class="card">
             <h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">⛸️ メニューと人数</h3>
-            <div id="menuContainer">
-                </div>
+            <div id="menuContainer"></div>
             <button type="button" class="add-btn" onclick="addMenuRow()">＋ 別のメニューを追加する</button>
         </div>
 
@@ -100,7 +104,6 @@
         
         let currentUserProfile = null;
 
-        // --- マスターデータ (軽量化のためフロントに持たせる) ---
         const menuOptions = [
             { id: "M01", name: "通常機械研磨", price: "3000円" },
             { id: "M02", name: "サイド調整", price: "1000円" },
@@ -108,89 +111,89 @@
             { id: "M04", name: "オーブンフィッティング", price: "4000円" },
             { id: "M05", name: "エッジ取り付け", price: "4000円" },
             { id: "M06", name: "エッジ位置調整", price: "2000円" },
+            { id: "M07", name: "インソール作成（パワー）", price: "18000円" },
+            { id: "M08", name: "インソール作成（バランス）", price: "8000円" },
             { id: "M09", name: "ホッケー研磨", price: "2500円" },
             { id: "M10", name: "スケート靴補強(片足)", price: "4000円" },
             { id: "M11", name: "ベロ補強(片足)", price: "2000円" },
             { id: "M12", name: "その他相談", price: "-" }
         ];
 
-        // --- 初期化処理 ---
         document.addEventListener("DOMContentLoaded", () => {
             initializeLiff();
             generateTimeOptions();
-            addMenuRow(); // 最初の1行目を追加
+            addMenuRow(); 
         });
 
         async function initializeLiff() {
             try {
                 await liff.init({ liffId: LIFF_ID });
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                    return;
-                }
+                if (!liff.isLoggedIn()) { liff.login(); return; }
                 currentUserProfile = await liff.getProfile();
                 document.getElementById('status-bar').style.display = 'none';
                 document.getElementById('reservationForm').style.display = 'block';
             } catch (error) {
-                console.error("LIFF Init Error:", error);
                 showStatus('エラー: LINEの連携に失敗しました', 'error');
             }
         }
 
-        // --- UI生成ロジック ---
-        // 11:00 〜 21:30 までの30分刻みの選択肢を生成
         function generateTimeOptions() {
             let optionsHtml = '<option value="">時間を選択</option>';
             for (let h = 11; h <= 21; h++) {
                 optionsHtml += `<option value="${h}:00">${h}:00</option>`;
                 optionsHtml += `<option value="${h}:30">${h}:30</option>`;
             }
-            document.getElementById('time1').innerHTML = optionsHtml;
-            document.getElementById('time2').innerHTML = optionsHtml;
-            document.getElementById('time3').innerHTML = optionsHtml;
+            for(let i=1; i<=3; i++) document.getElementById('time'+i).innerHTML = optionsHtml;
         }
 
-        // 自宅選択時に住所入力欄を表示
-        function toggleAddressField() {
-            const loc = document.getElementById('location').value;
-            document.getElementById('addressGroup').style.display = (loc === '自宅') ? 'block' : 'none';
+        function toggleExtraFields(num) {
+            const locVal = document.getElementById(`loc${num}`).value;
+            const extraInput = document.getElementById(`locExtra${num}`);
+            if (locVal === '自宅' || locVal === 'その他') {
+                extraInput.style.display = 'block';
+                extraInput.required = true;
+            } else {
+                extraInput.style.display = 'none';
+                extraInput.required = false;
+                extraInput.value = '';
+            }
         }
 
-        // 動的メニュー行の追加
         function addMenuRow() {
             const container = document.getElementById('menuContainer');
             const rowDiv = document.createElement('div');
             rowDiv.className = 'menu-row';
 
-            // メニュープルダウン
             let menuSelect = `<select class="menu-select" required><option value="">メニューを選択</option>`;
-            menuOptions.forEach(m => {
-                menuSelect += `<option value="${m.id}">${m.name} (${m.price})</option>`;
-            });
+            menuOptions.forEach(m => menuSelect += `<option value="${m.id}">${m.name} (${m.price})</option>`);
             menuSelect += `</select>`;
 
-            // 人数プルダウン (1〜5名)
             let peopleSelect = `<select class="people-select" required>`;
-            for(let i=1; i<=5; i++) {
-                peopleSelect += `<option value="${i}">${i}名</option>`;
-            }
+            for(let i=1; i<=10; i++) peopleSelect += `<option value="${i}">${i}名</option>`;
             peopleSelect += `</select>`;
 
-            // 削除ボタン (1行目以外に表示)
             const removeBtn = container.children.length > 0 ? `<button type="button" class="remove-btn" onclick="this.parentElement.remove()">×</button>` : `<div style="width:25px;"></div>`;
-
             rowDiv.innerHTML = menuSelect + peopleSelect + removeBtn;
             container.appendChild(rowDiv);
         }
 
-        // --- データ送信ロジック ---
+        function getCandidateData(num) {
+            const date = document.getElementById(`date${num}`).value;
+            const time = document.getElementById(`time${num}`).value;
+            const loc = document.getElementById(`loc${num}`).value;
+            const extra = document.getElementById(`locExtra${num}`).value;
+            
+            if (!date || !time || !loc) return null;
+            let finalLoc = (loc === '自宅' || loc === 'その他') ? `${loc}(${extra})` : loc;
+            return { date: date, time: time, location: finalLoc };
+        }
+
         document.getElementById('reservationForm').addEventListener('submit', async function(e) {
-            e.preventDefault(); // 画面遷移をブロック
+            e.preventDefault();
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
             submitBtn.innerText = "送信中...";
 
-            // 選択されたメニューの収集
             const menus = [];
             document.querySelectorAll('.menu-row').forEach(row => {
                 const menuId = row.querySelector('.menu-select').value;
@@ -198,46 +201,39 @@
                 if(menuId) menus.push({ menuId: menuId, people: parseInt(people) });
             });
 
-            // GASへ送るデータ(JSON)の構築
+            const candidates = [];
+            for (let i = 1; i <= 3; i++) {
+                const data = getCandidateData(i);
+                if (data) candidates.push(data);
+            }
+
             const payload = {
                 action: "submit_reservation",
                 user: {
                     userId: currentUserProfile ? currentUserProfile.userId : "Unknown",
                     displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
                 },
-                candidates: [
-                    { date: document.getElementById('date1').value, time: document.getElementById('time1').value },
-                    { date: document.getElementById('date2').value, time: document.getElementById('time2').value },
-                    { date: document.getElementById('date3').value, time: document.getElementById('time3').value }
-                ].filter(c => c.date && c.time), // 入力があるものだけ抽出
-                location: {
-                    name: document.getElementById('location').value,
-                    address: document.getElementById('homeAddress').value
-                },
+                candidates: candidates,
                 menus: menus
             };
 
             try {
-                // GASへPOST送信
                 const response = await fetch(GAS_API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' }, // CORS回避
+                    headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(payload)
                 });
-                
                 const result = await response.json();
                 
-                if(result.status === "pending" || result.status === "success") {
+                if(result.status === "success" || result.status === "pending") {
                     document.getElementById('reservationForm').style.display = 'none';
                     showStatus('仮予約リクエストを送信しました！LINEにて追ってご連絡いたします。', 'success');
-                    // liff.closeWindow(); // 成功時に自動で閉じる場合はコメントアウト解除
                 } else {
                     showStatus('エラー: ' + result.message, 'error');
                     submitBtn.disabled = false;
                     submitBtn.innerText = "予約リクエストを送信する";
                 }
             } catch (error) {
-                console.error("Fetch Error:", error);
                 showStatus('通信エラーが発生しました。', 'error');
                 submitBtn.disabled = false;
                 submitBtn.innerText = "予約リクエストを送信する";
