@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USD/JPY Live Charts</title>
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    :root {
+      --bg-primary:    #0d1117;
+      --bg-secondary:  #161b22;
+      --bg-tertiary:   #1c2128;
+      --border-color:  #30363d;
+      --text-primary:  #e6edf3;
+      --text-secondary:#8b949e;
+      --accent-green:  #3fb950;
+      --accent-red:    #f85149;
+      --accent-blue:   #58a6ff;
+      --accent-yellow: #d29922;
+      --font-mono:     'Courier New', Courier, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    #header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-shrink: 0;
+      height: 52px;
+    }
+    #header .title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 0.05em;
+    }
+    #current-price {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    #price-change {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+    }
+    #spread-display {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    #header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-btn {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .header-btn:hover { color: var(--text-primary); border-color: var(--accent-blue); }
+
+    /* status dot */
+    #status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent-yellow);
+      flex-shrink: 0;
+    }
+    #status-dot.live    { background: var(--accent-green); animation: pulse 2s infinite; }
+    #status-dot.error   { background: var(--accent-red); }
+    #status-dot.connecting { background: var(--accent-yellow); }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(63,185,80,.4); }
+      50%      { box-shadow: 0 0 0 5px rgba(63,185,80,0); }
+    }
+    #status-text { font-size: 0.75rem; color: var(--text-secondary); }
+
+    /* ── Main grid: 4 panels ── */
+    #main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      min-height: 0;
+    }
+
+    /* chart panels occupy cells */
+    .chart-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+    .panel-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .tf-select {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      outline: none;
+    }
+    .chart-container {
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── Data panel (bottom-right) ── */
+    #data-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #data-panel .panel-header { border-bottom: 1px solid var(--border-color); }
+    #data-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      padding: 7px 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+    .tab-btn:hover  { color: var(--text-primary); }
+    .tab-content {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    .tab-content.active { display: block; }
+
+    /* price data table */
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.82rem;
+    }
+    .data-row:last-child { border-bottom: none; }
+    .data-label { color: var(--text-secondary); }
+    .data-value { font-family: var(--font-mono); color: var(--text-primary); font-weight: 600; }
+    .data-value.up   { color: var(--accent-green); }
+    .data-value.down { color: var(--accent-red); }
+
+    /* analysis / news placeholder */
+    .placeholder-box {
+      border: 1px dashed var(--border-color);
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 8px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .placeholder-box .ph-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent-blue);
+      margin-bottom: 6px;
+    }
+    #news-list { list-style: none; }
+    #news-list li {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    #news-list li:last-child { border-bottom: none; }
+    #news-list .news-time { color: var(--accent-yellow); font-size: 0.7rem; margin-bottom: 2px; }
+    #signal-bar {
+      display: none;
+      padding: 6px 10px;
+      background: var(--bg-tertiary);
+      border-top: 1px solid var(--border-color);
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* ── Setup Modal ── */
+    #setup-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+    #setup-modal.visible { display: flex; }
+    #setup-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 28px;
+      width: 420px;
+      max-width: 95vw;
+    }
+    #setup-box h2 {
+      font-size: 1.1rem;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+    #setup-box .setup-desc {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .form-field { margin-bottom: 14px; }
+    .form-field label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-bottom: 5px;
+    }
+    .form-field input, .form-field select {
+      width: 100%;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 9px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-field input:focus, .form-field select:focus {
+      border-color: var(--accent-blue);
+    }
+    #setup-hint {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+    #setup-hint a { color: var(--accent-blue); }
+    #save-config-btn {
+      width: 100%;
+      background: var(--accent-blue);
+      border: none;
+      color: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    #save-config-btn:hover { opacity: 0.85; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+    ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+    /* responsive: stack vertically on narrow screens */
+    @media (max-width: 768px) {
+      #main {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(4, 1fr);
+        overflow-y: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Setup Modal ── -->
+<div id="setup-modal" class="visible">
+  <div id="setup-box">
+    <h2>OANDA API 設定</h2>
+    <p class="setup-desc">OANDAのAPIトークンとアカウントIDを入力してください。</p>
+    <div id="setup-hint">
+      アカウントをお持ちでない場合:<br>
+      1. <a href="https://www.oanda.com/jp-ja/trading/forex/" target="_blank">www.oanda.com</a> でデモ口座を開設<br>
+      2. My Account → Manage API Access でトークンを生成<br>
+      3. アカウントIDはMy Account → My Fundsで確認
+    </div>
+    <div class="form-field">
+      <label>APIトークン (Personal Access Token)</label>
+      <input type="password" id="input-token" placeholder="xxxxx-xxxxx-xxxxx-xxxxx-xxxxx">
+    </div>
+    <div class="form-field">
+      <label>アカウントID</label>
+      <input type="text" id="input-account" placeholder="001-001-1234567-001">
+    </div>
+    <div class="form-field">
+      <label>アカウント種別</label>
+      <select id="input-account-type">
+        <option value="practice">デモ口座 (Practice)</option>
+        <option value="live">本番口座 (Live)</option>
+      </select>
+    </div>
+    <button id="save-config-btn">接続開始</button>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div id="header">
+  <span class="title">USD/JPY</span>
+  <span id="current-price">---.-—-</span>
+  <span id="price-change"></span>
+  <span id="spread-display"></span>
+  <div id="header-right">
+    <span id="status-dot" class="connecting"></span>
+    <span id="status-text">設定待ち</span>
+    <button class="header-btn" id="settings-btn">設定</button>
+    <button class="header-btn" id="screenshot-btn" title="チャートをキャプチャ (将来: LLM分析用)">📷</button>
+  </div>
+</div>
+
+<div id="main">
+  <!-- Top-left: Chart A -->
+  <div class="chart-panel" id="panel-a">
+    <div class="panel-header">
+      <span class="panel-label">チャート 1</span>
+      <select class="tf-select" data-panel="a"></select>
+    </div>
+    <div class="chart-container" id="chart-a"></div>
+  </div>
+
+  <!-- Top-right: Chart C -->
+  <div class="chart-panel" id="panel-c">
+    <div class="panel-header">
+      <span class="panel-label">チャート 3</span>
+      <select class="tf-select" data-panel="c"></select>
+    </div>
+    <div class="chart-container" id="chart-c"></div>
+  </div>
+
+  <!-- Bottom-left: Chart B -->
+  <div class="chart-panel" id="panel-b">
+    <div class="panel-header">
+      <span class="panel-label">チャート 2</span>
+      <select class="tf-select" data-panel="b"></select>
+    </div>
+    <div class="chart-container" id="chart-b"></div>
+  </div>
+
+  <!-- Bottom-right: Data Panel -->
+  <div id="data-panel">
+    <div class="panel-header">
+      <span class="panel-label">データ / 分析</span>
+    </div>
+    <div id="data-tabs">
+      <button class="tab-btn active" data-tab="prices">価格</button>
+      <button class="tab-btn" data-tab="analysis">分析</button>
+      <button class="tab-btn" data-tab="news">ニュース</button>
+    </div>
+
+    <!-- Prices tab -->
+    <div class="tab-content active" id="tab-prices">
+      <div class="data-row"><span class="data-label">現在値 (Mid)</span><span class="data-value" id="dp-mid">---</span></div>
+      <div class="data-row"><span class="data-label">Bid</span><span class="data-value" id="dp-bid">---</span></div>
+      <div class="data-row"><span class="data-label">Ask</span><span class="data-value" id="dp-ask">---</span></div>
+      <div class="data-row"><span class="data-label">スプレッド</span><span class="data-value" id="dp-spread">---</span></div>
+      <div class="data-row"><span class="data-label">日足 始値</span><span class="data-value" id="dp-dopen">---</span></div>
+      <div class="data-row"><span class="data-label">日足 高値</span><span class="data-value" id="dp-dhigh">---</span></div>
+      <div class="data-row"><span class="data-label">日足 安値</span><span class="data-value" id="dp-dlow">---</span></div>
+      <div class="data-row"><span class="data-label">当日騰落</span><span class="data-value" id="dp-dchange">---</span></div>
+      <div class="data-row"><span class="data-label">最終更新</span><span class="data-value" id="dp-time" style="font-size:0.75rem;">---</span></div>
+      <div class="data-row"><span class="data-label">ティック数</span><span class="data-value" id="dp-ticks">0</span></div>
+    </div>
+
+    <!-- Analysis tab (future: local LLM) -->
+    <div class="tab-content" id="tab-analysis">
+      <div class="placeholder-box">
+        <div class="ph-title">テクニカル分析 (実装予定)</div>
+        チャートの状態を解析し、移動平均・ボリンジャーバンド・RSIなどのシグナルを表示します。
+      </div>
+      <div class="placeholder-box">
+        <div class="ph-title">ローカルLLM分析 (実装予定)</div>
+        Ollama (localhost:11434) と連携し、チャート画像・ニュース・テクニカル指標を総合判断して売買シグナルを生成します。
+      </div>
+      <div id="signal-bar">シグナルなし</div>
+    </div>
+
+    <!-- News tab (future: OANDA news) -->
+    <div class="tab-content" id="tab-news">
+      <div class="placeholder-box">
+        <div class="ph-title">為替ニュース (実装予定)</div>
+        OANDA / 外部ニュースAPIからUSD/JPY関連のニュースをリアルタイムで取得・表示します。
+      </div>
+      <ul id="news-list"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Constants ────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'forex_oanda_config';
+const INSTRUMENT  = 'USD_JPY';
+const HISTORY_COUNT = 200;
+
+const TIMEFRAME_DEFS = [
+  { key: 'M1',  label: '1分足',   seconds: 60    },
+  { key: 'M5',  label: '5分足',   seconds: 300   },
+  { key: 'M15', label: '15分足',  seconds: 900   },
+  { key: 'M30', label: '30分足',  seconds: 1800  },
+  { key: 'H1',  label: '1時間足', seconds: 3600  },
+  { key: 'H4',  label: '4時間足', seconds: 14400 },
+  { key: 'D',   label: '日足',    seconds: 86400 },
+];
+
+// Default assignment: panel A=H1, B=M5, C=M1
+const DEFAULT_PANELS = { a: 'H1', b: 'M5', c: 'M1' };
+
+const OANDA_BASE = {
+  practice: {
+    rest:   'https://api-fxpractice.oanda.com/v3',
+    stream: 'https://stream-fxpractice.oanda.com/v3',
+  },
+  live: {
+    rest:   'https://api-fxtrade.oanda.com/v3',
+    stream: 'https://stream-fxtrade.oanda.com/v3',
+  },
+};
+
+// ── Application State ────────────────────────────────────────────────────────
+const state = {
+  config: null,        // { apiToken, accountId, accountType }
+  streamReader: null,
+  reconnectTimer: null,
+  reconnectDelay: 3000,
+  tickCount: 0,
+  lastBid: null,
+  lastAsk: null,
+
+  // Active timeframe per panel
+  panels: { ...DEFAULT_PANELS },
+
+  // Candle buffers per timeframe key
+  buffers: {},       // { 'M1': { candles:[], currentCandle:null }, ... }
+
+  // Chart instances per panel
+  charts: {
+    a: { chart: null, series: null, tf: null },
+    b: { chart: null, series: null, tf: null },
+    c: { chart: null, series: null, tf: null },
+  },
+
+  // Daily candle reference
+  dailyRef: { open: null, high: null, low: null },
+};
+
+// Initialize buffers for all timeframes
+TIMEFRAME_DEFS.forEach(tf => {
+  state.buffers[tf.key] = { candles: [], currentCandle: null };
+});
+
+// ── Config Management ────────────────────────────────────────────────────────
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { return null; }
+}
+function saveConfig(cfg) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+  state.config = cfg;
+}
+
+// ── Setup Modal ──────────────────────────────────────────────────────────────
+function showSetupModal() {
+  document.getElementById('setup-modal').classList.add('visible');
+  if (state.config) {
+    document.getElementById('input-token').value   = state.config.apiToken   || '';
+    document.getElementById('input-account').value = state.config.accountId  || '';
+    document.getElementById('input-account-type').value = state.config.accountType || 'practice';
+  }
+}
+function hideSetupModal() {
+  document.getElementById('setup-modal').classList.remove('visible');
+}
+
+document.getElementById('save-config-btn').addEventListener('click', () => {
+  const token   = document.getElementById('input-token').value.trim();
+  const account = document.getElementById('input-account').value.trim();
+  const type    = document.getElementById('input-account-type').value;
+  if (!token || !account) { alert('APIトークンとアカウントIDは必須です。'); return; }
+  saveConfig({ apiToken: token, accountId: account, accountType: type });
+  hideSetupModal();
+  stopStream();
+  bootstrap();
+});
+
+document.getElementById('settings-btn').addEventListener('click', () => {
+  stopStream();
+  showSetupModal();
+});
+
+// ── Tab switching ────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+  });
+});
+
+// ── Timeframe selector dropdowns ─────────────────────────────────────────────
+function buildSelectors() {
+  document.querySelectorAll('.tf-select').forEach(sel => {
+    const panel = sel.dataset.panel;
+    TIMEFRAME_DEFS.forEach(tf => {
+      const opt = document.createElement('option');
+      opt.value = tf.key;
+      opt.textContent = tf.label;
+      if (tf.key === state.panels[panel]) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', () => switchPanelTf(panel, sel.value));
+  });
+}
+
+async function switchPanelTf(panel, tfKey) {
+  state.panels[panel] = tfKey;
+  const tfDef = TIMEFRAME_DEFS.find(t => t.key === tfKey);
+
+  // Destroy old chart and recreate
+  const chartState = state.charts[panel];
+  if (chartState.chart) {
+    chartState.chart.remove();
+    chartState.chart = null;
+    chartState.series = null;
+  }
+  initChart(panel, tfDef);
+
+  // Load historical data for this TF if not yet loaded
+  if (state.buffers[tfKey].candles.length === 0 && state.config) {
+    setStatus('データ読込中...', 'connecting');
+    await fetchHistoricalData(tfDef);
+  }
+
+  // Paint historical data onto new chart
+  const bars = state.buffers[tfKey].candles.map(c => ({
+    time: c.time, open: c.open, high: c.high, low: c.low, close: c.close
+  }));
+  if (bars.length > 0) chartState.series.setData(bars);
+  if (state.buffers[tfKey].currentCandle) {
+    chartState.series.update(state.buffers[tfKey].currentCandle);
+  }
+  if (state.config) setStatus('接続中', 'live');
+}
+
+// ── Chart Initialization ─────────────────────────────────────────────────────
+function initAllCharts() {
+  Object.entries(state.panels).forEach(([panel, tfKey]) => {
+    const tfDef = TIMEFRAME_DEFS.find(t => t.key === tfKey);
+    initChart(panel, tfDef);
+  });
+}
+
+function initChart(panel, tfDef) {
+  const container = document.getElementById('chart-' + panel);
+  container.innerHTML = '';
+
+  const chart = LightweightCharts.createChart(container, {
+    layout: {
+      background: { color: '#161b22' },
+      textColor: '#8b949e',
+    },
+    grid: {
+      vertLines: { color: '#1c2128' },
+      horzLines: { color: '#1c2128' },
+    },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: {
+      borderColor: '#30363d',
+      scaleMargins: { top: 0.08, bottom: 0.08 },
+    },
+    timeScale: {
+      borderColor: '#30363d',
+      timeVisible: true,
+      secondsVisible: tfDef.seconds < 60,
+    },
+    autoSize: true,
+  });
+
+  const series = chart.addCandlestickSeries({
+    upColor:        '#3fb950',
+    downColor:      '#f85149',
+    borderUpColor:  '#3fb950',
+    borderDownColor:'#f85149',
+    wickUpColor:    '#3fb950',
+    wickDownColor:  '#f85149',
+  });
+
+  state.charts[panel].chart  = chart;
+  state.charts[panel].series = series;
+  state.charts[panel].tf     = tfDef;
+}
+
+// ── Historical Data Fetch ────────────────────────────────────────────────────
+function oandaTimeToUnix(t) {
+  // t is Unix timestamp string (with nanoseconds) from OANDA when acceptDatetimeFormat=UNIX
+  return Math.floor(parseFloat(t));
+}
+
+async function fetchHistoricalData(tfDef) {
+  const { rest } = OANDA_BASE[state.config.accountType];
+  const url = `${rest}/instruments/${INSTRUMENT}/candles?count=${HISTORY_COUNT}&granularity=${tfDef.key}&price=M&acceptDatetimeFormat=UNIX`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${state.config.apiToken}` }
+  });
+  if (!res.ok) throw new Error(`OANDA REST ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+
+  const candles = (data.candles || []).map(c => ({
+    time:  oandaTimeToUnix(c.time),
+    open:  parseFloat(c.mid.o),
+    high:  parseFloat(c.mid.h),
+    low:   parseFloat(c.mid.l),
+    close: parseFloat(c.mid.c),
+  }));
+
+  state.buffers[tfDef.key].candles = candles;
+  state.buffers[tfDef.key].currentCandle = candles.length > 0 ? { ...candles[candles.length - 1] } : null;
+  return candles;
+}
+
+async function fetchAllHistoricalData() {
+  // Collect unique timeframes currently shown in panels
+  const needed = [...new Set(Object.values(state.panels))];
+  for (const tfKey of needed) {
+    const tfDef = TIMEFRAME_DEFS.find(t => t.key === tfKey);
+    setStatus(`${tfDef.label} 読込中...`, 'connecting');
+    const candles = await fetchHistoricalData(tfDef);
+    const bars = candles.map(c => ({
+      time: c.time, open: c.open, high: c.high, low: c.low, close: c.close
+    }));
+    // Paint into all panels using this TF
+    Object.entries(state.panels).forEach(([panel, pk]) => {
+      if (pk === tfKey && state.charts[panel].series) {
+        state.charts[panel].series.setData(bars);
+      }
+    });
+  }
+
+  // Also fetch daily candle for day reference
+  try {
+    await fetchDailyRef();
+  } catch (e) { /* non-critical */ }
+}
+
+async function fetchDailyRef() {
+  const { rest } = OANDA_BASE[state.config.accountType];
+  const url = `${rest}/instruments/${INSTRUMENT}/candles?count=1&granularity=D&price=M&acceptDatetimeFormat=UNIX`;
+  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${state.config.apiToken}` }});
+  if (!res.ok) return;
+  const data = await res.json();
+  if (data.candles && data.candles.length > 0) {
+    const c = data.candles[0];
+    state.dailyRef = {
+      open:  parseFloat(c.mid.o),
+      high:  parseFloat(c.mid.h),
+      low:   parseFloat(c.mid.l),
+    };
+    updateDataPanel();
+  }
+}
+
+// ── Tick Processing ──────────────────────────────────────────────────────────
+function getCandleBucket(unixSec, tfSeconds) {
+  return Math.floor(unixSec / tfSeconds) * tfSeconds;
+}
+
+function processTick(bid, ask, unixMs) {
+  const price   = (bid + ask) / 2;
+  const unixSec = Math.floor(unixMs / 1000);
+  state.tickCount++;
+
+  TIMEFRAME_DEFS.forEach(tfDef => {
+    const bucket = getCandleBucket(unixSec, tfDef.seconds);
+    const buf    = state.buffers[tfDef.key];
+    const cur    = buf.currentCandle;
+
+    if (!cur || bucket > cur.time) {
+      if (cur && cur.time > 0) buf.candles.push({ ...cur });
+      buf.currentCandle = { time: bucket, open: price, high: price, low: price, close: price };
+    } else {
+      cur.high  = Math.max(cur.high, price);
+      cur.low   = Math.min(cur.low, price);
+      cur.close = price;
+    }
+
+    // Update all panels showing this TF
+    Object.entries(state.panels).forEach(([panel, pk]) => {
+      if (pk === tfDef.key && state.charts[panel].series) {
+        state.charts[panel].series.update(buf.currentCandle);
+      }
+    });
+  });
+
+  // Update daily high/low
+  if (state.dailyRef.high !== null) {
+    state.dailyRef.high = Math.max(state.dailyRef.high, price);
+    state.dailyRef.low  = Math.min(state.dailyRef.low,  price);
+  }
+
+  state.lastBid = bid;
+  state.lastAsk = ask;
+  updatePriceHeader(bid, ask);
+  updateDataPanel();
+}
+
+// ── Price Header ─────────────────────────────────────────────────────────────
+function updatePriceHeader(bid, ask) {
+  const mid    = (bid + ask) / 2;
+  const spread = ((ask - bid) * 100).toFixed(1);
+  const el     = document.getElementById('current-price');
+  el.textContent = formatPrice(mid);
+
+  document.getElementById('spread-display').textContent = `スプレッド: ${spread}銭`;
+
+  const chEl = document.getElementById('price-change');
+  if (state.dailyRef.open !== null) {
+    const diff  = mid - state.dailyRef.open;
+    const pct   = ((diff / state.dailyRef.open) * 100).toFixed(2);
+    const sign  = diff >= 0 ? '+' : '';
+    chEl.textContent = `${sign}${diff.toFixed(3)} (${sign}${pct}%)`;
+    chEl.style.color = diff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  }
+}
+
+// ── Data Panel ───────────────────────────────────────────────────────────────
+function updateDataPanel() {
+  const bid = state.lastBid, ask = state.lastAsk;
+  if (bid === null) return;
+  const mid    = (bid + ask) / 2;
+  const spread = ((ask - bid) * 100).toFixed(1);
+
+  setText('dp-mid',    formatPrice(mid));
+  setText('dp-bid',    formatPrice(bid));
+  setText('dp-ask',    formatPrice(ask));
+  setText('dp-spread', `${spread}銭`);
+  setText('dp-ticks',  state.tickCount.toLocaleString());
+  setText('dp-time',   new Date().toLocaleTimeString('ja-JP'));
+
+  if (state.dailyRef.open !== null) {
+    setText('dp-dopen', formatPrice(state.dailyRef.open));
+    const dhEl = document.getElementById('dp-dhigh');
+    dhEl.textContent = formatPrice(state.dailyRef.high);
+    dhEl.className   = 'data-value up';
+    const dlEl = document.getElementById('dp-dlow');
+    dlEl.textContent = formatPrice(state.dailyRef.low);
+    dlEl.className   = 'data-value down';
+
+    const diff = mid - state.dailyRef.open;
+    const sign = diff >= 0 ? '+' : '';
+    const dcEl = document.getElementById('dp-dchange');
+    dcEl.textContent = `${sign}${diff.toFixed(3)}`;
+    dcEl.className   = 'data-value ' + (diff >= 0 ? 'up' : 'down');
+  }
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+// ── HTTP Streaming ───────────────────────────────────────────────────────────
+async function startPriceStream() {
+  if (!state.config) return;
+  const { stream } = OANDA_BASE[state.config.accountType];
+  const url = `${stream}/accounts/${state.config.accountId}/pricing/stream?instruments=${INSTRUMENT}`;
+
+  setStatus('接続中...', 'connecting');
+  try {
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${state.config.apiToken}` }
+    });
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(`ストリームエラー ${res.status}: ${msg}`);
+    }
+    setStatus('LIVE', 'live');
+    state.reconnectDelay = 3000;
+    state.streamReader   = res.body.getReader();
+    await consumeStream(state.streamReader);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    setStatus(`エラー: ${err.message}`, 'error');
+    scheduleReconnect();
+  }
+}
+
+async function consumeStream(reader) {
+  const decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let msg;
+      try { msg = JSON.parse(line); } catch { continue; }
+      if (msg.type === 'PRICE' && msg.tradeable !== false) {
+        const bid = parseFloat(msg.bids[0].price);
+        const ask = parseFloat(msg.asks[0].price);
+        const t   = new Date(msg.time).getTime();
+        processTick(bid, ask, t);
+      }
+    }
+  }
+  // Stream ended cleanly, schedule reconnect
+  scheduleReconnect();
+}
+
+function stopStream() {
+  if (state.reconnectTimer) { clearTimeout(state.reconnectTimer); state.reconnectTimer = null; }
+  if (state.streamReader)   { state.streamReader.cancel(); state.streamReader = null; }
+  setStatus('停止', 'connecting');
+}
+
+function scheduleReconnect() {
+  state.reconnectTimer = setTimeout(() => {
+    state.reconnectDelay = Math.min(state.reconnectDelay * 2, 30000);
+    startPriceStream();
+  }, state.reconnectDelay);
+  setStatus(`再接続待ち (${state.reconnectDelay / 1000}s)`, 'connecting');
+}
+
+// ── Status ───────────────────────────────────────────────────────────────────
+function setStatus(msg, type) {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className  = type;
+  text.textContent = msg;
+}
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function formatPrice(p) { return p.toFixed(3); }
+
+// ── Screenshot stub (future: LLM image analysis) ─────────────────────────────
+// async function captureChartImage(panel) {
+//   const canvas = state.charts[panel].chart.takeScreenshot();
+//   return canvas.toDataURL('image/png').split(',')[1]; // base64
+// }
+document.getElementById('screenshot-btn').addEventListener('click', () => {
+  alert('スクリーンショット機能は将来のLLM分析機能実装時に有効になります。\n(Ollama localhost:11434 との連携予定)');
+});
+
+// ── Local LLM analysis stub (future: Ollama integration) ─────────────────────
+// async function analyzeWithLLM(prompt, imageBase64 = null) {
+//   const body = { model: 'llava', prompt, stream: false };
+//   if (imageBase64) body.images = [imageBase64];
+//   const res = await fetch('http://localhost:11434/api/generate', {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(body),
+//   });
+//   const data = await res.json();
+//   return data.response;
+// }
+
+// ── News stub (future: news API integration) ─────────────────────────────────
+// async function fetchNews() {
+//   // OANDA news or external API integration
+//   const items = await getNewsItems(); // to be implemented
+//   const list = document.getElementById('news-list');
+//   list.innerHTML = items.map(n =>
+//     `<li><div class="news-time">${n.time}</div>${n.title}</li>`
+//   ).join('');
+// }
+
+// ── Trade signal display stub ─────────────────────────────────────────────────
+// function displaySignal(direction, confidence, reasoning) {
+//   const bar = document.getElementById('signal-bar');
+//   bar.style.display = 'block';
+//   bar.style.color = direction === 'BUY' ? 'var(--accent-green)' : 'var(--accent-red)';
+//   bar.textContent = `${direction} | 信頼度: ${confidence}% | ${reasoning}`;
+// }
+
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+async function bootstrap() {
+  state.tickCount = 0;
+  setStatus('初期化中...', 'connecting');
+
+  initAllCharts();
+
+  try {
+    await fetchAllHistoricalData();
+  } catch (err) {
+    setStatus(`データ取得エラー: ${err.message}`, 'error');
+    return;
+  }
+
+  startPriceStream();
+}
+
+// ── Entry Point ───────────────────────────────────────────────────────────────
+buildSelectors();
+const cfg = loadConfig();
+if (cfg && cfg.apiToken && cfg.accountId) {
+  state.config = cfg;
+  hideSetupModal();
+  bootstrap();
+} else {
+  showSetupModal();
+  setStatus('設定待ち', 'connecting');
+}
+</script>
+</body>
+</html>
