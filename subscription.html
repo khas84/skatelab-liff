@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SkateLab 月額メンテプラン</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        :root {
+            --primary: #00B900;
+            --primary-dark: #009900;
+            --gold: #f5a623;
+            --bg: #f4f5f7;
+            --card: #ffffff;
+            --text: #333333;
+            --border: #dddddd;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0 0 40px;
+        }
+        .hero {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px 25px;
+        }
+        .hero .icon { font-size: 2.5rem; margin-bottom: 8px; }
+        .hero h1 { font-size: 1.3rem; margin: 0 0 6px; letter-spacing: 0.05em; }
+        .hero p { font-size: 0.85rem; opacity: 0.85; margin: 0; line-height: 1.6; }
+
+        .section-title {
+            text-align: center;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #555;
+            padding: 20px 16px 10px;
+            letter-spacing: 0.03em;
+        }
+
+        .plans { padding: 0 16px; display: flex; flex-direction: column; gap: 14px; }
+
+        .plan-card {
+            background: var(--card);
+            border-radius: 14px;
+            border: 2px solid var(--border);
+            padding: 20px;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+            position: relative;
+        }
+        .plan-card:active { transform: scale(0.98); }
+        .plan-card.selected {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0,185,0,0.15);
+        }
+        .plan-card.featured { border-color: var(--gold); }
+        .plan-card.featured.selected { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245,166,35,0.2); }
+
+        .badge {
+            position: absolute;
+            top: -11px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--gold);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: bold;
+            padding: 3px 12px;
+            border-radius: 20px;
+            white-space: nowrap;
+            letter-spacing: 0.05em;
+        }
+
+        .plan-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .plan-name { font-size: 1.1rem; font-weight: bold; }
+        .plan-price-wrap { text-align: right; }
+        .plan-price { font-size: 1.6rem; font-weight: bold; color: var(--primary); line-height: 1; }
+        .plan-price.gold { color: var(--gold); }
+        .plan-price-unit { font-size: 0.75rem; color: #888; }
+
+        .plan-perks { list-style: none; margin: 0; padding: 0; }
+        .plan-perks li {
+            font-size: 0.85rem;
+            padding: 4px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            color: #444;
+            line-height: 1.4;
+        }
+        .plan-perks li::before { content: "✓"; color: var(--primary); font-weight: bold; flex-shrink: 0; }
+        .plan-card.featured .plan-perks li::before { color: var(--gold); }
+
+        .plan-divider { border: none; border-top: 1px dashed #eee; margin: 12px 0; }
+
+        .select-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-top: 12px;
+        }
+        .plan-card.selected .select-indicator { color: var(--primary); font-weight: bold; }
+        .plan-card.featured.selected .select-indicator { color: var(--gold); }
+        .radio-circle {
+            width: 18px; height: 18px;
+            border: 2px solid #ccc;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .plan-card.selected .radio-circle { border-color: var(--primary); }
+        .plan-card.featured.selected .radio-circle { border-color: var(--gold); }
+        .radio-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: transparent;
+            transition: background 0.15s;
+        }
+        .plan-card.selected .radio-dot { background: var(--primary); }
+        .plan-card.featured.selected .radio-dot { background: var(--gold); }
+
+        .benefits-section {
+            background: var(--card);
+            margin: 20px 16px;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .benefits-section h3 { font-size: 0.95rem; margin: 0 0 12px; color: #333; }
+        .benefit-item { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+        .benefit-icon { font-size: 1.3rem; flex-shrink: 0; line-height: 1; }
+        .benefit-text { font-size: 0.82rem; line-height: 1.5; color: #555; }
+        .benefit-text strong { color: #333; display: block; font-size: 0.88rem; }
+
+        .cta-wrap { padding: 0 16px; margin-top: 24px; }
+        .cta-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,185,0,0.35);
+            letter-spacing: 0.03em;
+            transition: opacity 0.15s;
+        }
+        .cta-btn:disabled { background: linear-gradient(135deg, #aaa, #999); box-shadow: none; cursor: not-allowed; }
+        .cta-btn.gold-btn { background: linear-gradient(135deg, #f5a623, #e09612); box-shadow: 0 4px 12px rgba(245,166,35,0.35); }
+        .cta-sub { text-align: center; font-size: 0.75rem; color: #aaa; margin-top: 8px; }
+
+        #status-bar {
+            text-align: center;
+            padding: 10px 16px;
+            margin: 10px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            display: none;
+        }
+        .loading { background: #fff3cd; color: #856404; display: block !important; }
+        .success { background: #d4edda; color: #155724; display: block !important; }
+        .error { background: #f8d7da; color: #721c24; display: block !important; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: flex-end;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-sheet {
+            background: white;
+            border-radius: 20px 20px 0 0;
+            padding: 24px 20px 40px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-sheet h3 { margin: 0 0 16px; font-size: 1.1rem; text-align: center; }
+        .modal-close {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+        .confirm-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+        .confirm-row:last-of-type { border-bottom: none; }
+        .confirm-row .label { color: #666; }
+        .confirm-row .value { font-weight: bold; }
+        .confirm-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+        .confirm-submit.gold-btn { background: linear-gradient(135deg, #f5a623, #e09612); }
+    </style>
+</head>
+<body>
+
+<div class="hero">
+    <div class="icon">⛸️</div>
+    <h1>SkateLab 月額メンテプラン</h1>
+    <p>毎月自動で予約枠確保・割引特典付き<br>スケート靴を最高の状態に保ちましょう</p>
+</div>
+
+<div id="status-bar"></div>
+
+<div id="mainContent">
+    <p class="section-title">プランを選択してください</p>
+
+    <div class="plans">
+
+        <!-- ベーシックプラン -->
+        <div class="plan-card" id="plan-basic" onclick="selectPlan('basic')">
+            <div class="plan-header">
+                <div class="plan-name">ベーシックプラン</div>
+                <div class="plan-price-wrap">
+                    <div class="plan-price">¥2,000</div>
+                    <div class="plan-price-unit">/月（税込）</div>
+                </div>
+            </div>
+            <ul class="plan-perks">
+                <li>月1回 エッジ研磨（通常3,000円）優先予約権</li>
+                <li>研磨料金10%OFF</li>
+                <li>LINEでの技術相談（月3回）</li>
+                <li>翌月へのくり越し不可</li>
+            </ul>
+            <hr class="plan-divider">
+            <div class="select-indicator">
+                <div class="radio-circle"><div class="radio-dot"></div></div>
+                <span>このプランを選ぶ</span>
+            </div>
+        </div>
+
+        <!-- スタンダードプラン（推奨） -->
+        <div class="plan-card featured" id="plan-standard" onclick="selectPlan('standard')">
+            <div class="badge">いちばん人気</div>
+            <div class="plan-header">
+                <div class="plan-name">スタンダードプラン</div>
+                <div class="plan-price-wrap">
+                    <div class="plan-price gold">¥4,500</div>
+                    <div class="plan-price-unit">/月（税込）</div>
+                </div>
+            </div>
+            <ul class="plan-perks">
+                <li>月1回 エッジ研磨 無料（通常3,000円相当）</li>
+                <li>全メニュー15%OFF</li>
+                <li>LINEでの技術相談 無制限</li>
+                <li>緊急メンテ優先対応</li>
+                <li>1ヶ月くり越し可</li>
+            </ul>
+            <hr class="plan-divider">
+            <div class="select-indicator">
+                <div class="radio-circle"><div class="radio-dot"></div></div>
+                <span>このプランを選ぶ</span>
+            </div>
+        </div>
+
+        <!-- プレミアムプラン -->
+        <div class="plan-card" id="plan-premium" onclick="selectPlan('premium')">
+            <div class="plan-header">
+                <div class="plan-name">プレミアムプラン</div>
+                <div class="plan-price-wrap">
+                    <div class="plan-price">¥9,800</div>
+                    <div class="plan-price-unit">/月（税込）</div>
+                </div>
+            </div>
+            <ul class="plan-perks">
+                <li>月2回 全メニュー無料（最大6,000円相当）</li>
+                <li>全メニュー20%OFF（3回目以降）</li>
+                <li>LINEでの技術相談 無制限＋通話対応</li>
+                <li>シーズン前フルメンテ点検（年2回）</li>
+                <li>2ヶ月くり越し可</li>
+                <li>新規顧客ご紹介で月500円割引</li>
+            </ul>
+            <hr class="plan-divider">
+            <div class="select-indicator">
+                <div class="radio-circle"><div class="radio-dot"></div></div>
+                <span>このプランを選ぶ</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="benefits-section">
+        <h3>サブスク会員の特典</h3>
+        <div class="benefit-item">
+            <div class="benefit-icon">📅</div>
+            <div class="benefit-text">
+                <strong>優先予約枠の確保</strong>
+                会員専用の予約枠を毎月確保。混雑期でも安心してメンテができます。
+            </div>
+        </div>
+        <div class="benefit-item">
+            <div class="benefit-icon">💬</div>
+            <div class="benefit-text">
+                <strong>LINEで気軽に相談</strong>
+                エッジの状態や靴の悩みをいつでもLINEで相談可能。試合前のアドバイスも。
+            </div>
+        </div>
+        <div class="benefit-item">
+            <div class="benefit-icon">🔄</div>
+            <div class="benefit-text">
+                <strong>いつでも解約・変更OK</strong>
+                縛りなし。翌月分の請求前（毎月25日まで）にLINEで連絡するだけで解約できます。
+            </div>
+        </div>
+    </div>
+
+    <div class="cta-wrap">
+        <button class="cta-btn" id="ctaBtn" disabled onclick="openConfirmModal()">
+            プランを選択してください
+        </button>
+        <p class="cta-sub">初月は日割り計算 ・ クレジットカード / Apple Pay 対応</p>
+    </div>
+</div>
+
+<!-- 確認モーダル -->
+<div class="modal-overlay" id="confirmModal">
+    <div class="modal-sheet">
+        <h3>お申込み内容の確認</h3>
+        <div class="confirm-row">
+            <span class="label">プラン</span>
+            <span class="value" id="confirmPlanName">-</span>
+        </div>
+        <div class="confirm-row">
+            <span class="label">月額料金</span>
+            <span class="value" id="confirmPrice">-</span>
+        </div>
+        <div class="confirm-row">
+            <span class="label">お支払い</span>
+            <span class="value">クレジットカード / Apple Pay</span>
+        </div>
+        <div class="confirm-row">
+            <span class="label">次回更新</span>
+            <span class="value" id="confirmNextDate">-</span>
+        </div>
+        <button class="confirm-submit" id="confirmSubmitBtn" onclick="startCheckout()">
+            決済へ進む
+        </button>
+        <button class="modal-close" onclick="closeConfirmModal()">キャンセル</button>
+    </div>
+</div>
+
+<script>
+    const LIFF_ID = "2009436433-Nh9ImTsd"; // 既存LIFFと同じID or サブスク用に別途発行
+    const GAS_WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxT953bsPswsxiL5n7vXFtgkTLc6LeNcSXFsXy4ybKFbppLKcyvGlYYATRXmUWnd_Ww2A/exec";
+    // TODO: Stripeの公開可能キーをここに設定
+    const STRIPE_PUBLIC_KEY = "pk_live_YOUR_STRIPE_PUBLIC_KEY_HERE";
+
+    const PLANS = {
+        basic: {
+            name: "ベーシックプラン",
+            price: "¥2,000/月",
+            amount: 2000,
+            // TODO: Stripeダッシュボードで作成したPrice IDを設定
+            stripePriceId: "price_BASIC_PLAN_ID_HERE"
+        },
+        standard: {
+            name: "スタンダードプラン",
+            price: "¥4,500/月",
+            amount: 4500,
+            stripePriceId: "price_STANDARD_PLAN_ID_HERE"
+        },
+        premium: {
+            name: "プレミアムプラン",
+            price: "¥9,800/月",
+            amount: 9800,
+            stripePriceId: "price_PREMIUM_PLAN_ID_HERE"
+        }
+    };
+
+    let selectedPlan = null;
+    let userProfile = null;
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        await initLiff();
+    });
+
+    async function initLiff() {
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
+            userProfile = await liff.getProfile();
+        } catch (e) {
+            console.error("LIFF init error:", e);
+            // ブラウザ直接アクセス時はプロフィールなしで続行
+        }
+    }
+
+    function selectPlan(planKey) {
+        selectedPlan = planKey;
+
+        document.querySelectorAll('.plan-card').forEach(card => card.classList.remove('selected'));
+        document.getElementById('plan-' + planKey).classList.add('selected');
+
+        const plan = PLANS[planKey];
+        const btn = document.getElementById('ctaBtn');
+        btn.disabled = false;
+        btn.textContent = plan.name + " に申し込む";
+        if (planKey === 'standard') {
+            btn.className = 'cta-btn gold-btn';
+        } else {
+            btn.className = 'cta-btn';
+        }
+    }
+
+    function openConfirmModal() {
+        if (!selectedPlan) return;
+        const plan = PLANS[selectedPlan];
+
+        document.getElementById('confirmPlanName').textContent = plan.name;
+        document.getElementById('confirmPrice').textContent = plan.price + "（税込）";
+
+        const nextDate = getNextBillingDate();
+        document.getElementById('confirmNextDate').textContent = nextDate;
+
+        const submitBtn = document.getElementById('confirmSubmitBtn');
+        if (selectedPlan === 'standard') {
+            submitBtn.className = 'confirm-submit gold-btn';
+        } else {
+            submitBtn.className = 'confirm-submit';
+        }
+
+        document.getElementById('confirmModal').classList.add('open');
+    }
+
+    function closeConfirmModal() {
+        document.getElementById('confirmModal').classList.remove('open');
+    }
+
+    function getNextBillingDate() {
+        const now = new Date();
+        const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        return `${next.getFullYear()}年${next.getMonth() + 1}月1日`;
+    }
+
+    async function startCheckout() {
+        if (!selectedPlan) return;
+
+        const plan = PLANS[selectedPlan];
+        const submitBtn = document.getElementById('confirmSubmitBtn');
+        submitBtn.disabled = true;
+        submitBtn.textContent = "処理中...";
+
+        try {
+            // Step 1: GASにサブスク申込を通知（Stripe Checkout URL生成リクエスト）
+            const payload = {
+                action: "create_subscription_checkout",
+                plan: selectedPlan,
+                planName: plan.name,
+                amount: plan.amount,
+                stripePriceId: plan.stripePriceId,
+                user: {
+                    userId: userProfile ? userProfile.userId : "web_user_" + Date.now(),
+                    displayName: userProfile ? userProfile.displayName : "Web User",
+                    pictureUrl: userProfile ? userProfile.pictureUrl : ""
+                }
+            };
+
+            const response = await fetch(GAS_WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain" },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (result.checkoutUrl) {
+                // Stripe Checkout URLにリダイレクト
+                window.location.href = result.checkoutUrl;
+            } else if (result.status === "redirect_to_stripe") {
+                // 代替：Stripe.js を使ったリダイレクト
+                const stripe = Stripe(STRIPE_PUBLIC_KEY);
+                await stripe.redirectToCheckout({ sessionId: result.sessionId });
+            } else {
+                throw new Error(result.message || "決済URLの取得に失敗しました");
+            }
+
+        } catch (e) {
+            console.error(e);
+            submitBtn.disabled = false;
+            submitBtn.textContent = "決済へ進む";
+            closeConfirmModal();
+            showStatus("エラーが発生しました。もう一度お試しください。", "error");
+        }
+    }
+
+    function showStatus(msg, type) {
+        const el = document.getElementById('status-bar');
+        el.textContent = msg;
+        el.className = type;
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SkateLab - お申込み完了</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", sans-serif;
+            background: #f4f5f7;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 30px;
+            text-align: center;
+            margin: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+        .check-icon {
+            width: 72px; height: 72px;
+            background: linear-gradient(135deg, #00B900, #009900);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 2rem;
+        }
+        h1 { font-size: 1.3rem; color: #333; margin: 0 0 10px; }
+        p { color: #666; font-size: 0.9rem; line-height: 1.7; margin: 0 0 20px; }
+        .plan-badge {
+            background: #f0fff0;
+            border: 1px solid #00B900;
+            color: #006600;
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        .next-steps {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 16px;
+            text-align: left;
+            margin-bottom: 24px;
+        }
+        .next-steps h3 { font-size: 0.9rem; color: #555; margin: 0 0 10px; }
+        .step { display: flex; gap: 10px; margin-bottom: 8px; font-size: 0.85rem; color: #444; align-items: flex-start; }
+        .step-num {
+            background: #00B900; color: white;
+            border-radius: 50%; width: 20px; height: 20px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; font-weight: bold; flex-shrink: 0;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #00B900, #009900);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            margin-bottom: 10px;
+        }
+        .btn-outline {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: white;
+            color: #00B900;
+            border: 2px solid #00B900;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="check-icon">✓</div>
+        <h1>お申込みが完了しました！</h1>
+        <div class="plan-badge" id="planBadge">メンバー登録完了</div>
+        <p>ご加入ありがとうございます。<br>LINEにて詳細をお送りします。</p>
+
+        <div class="next-steps">
+            <h3>次のステップ</h3>
+            <div class="step">
+                <div class="step-num">1</div>
+                <span>LINEの通知をご確認ください（数分以内に届きます）</span>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <span>予約システムから優先枠でご予約いただけます</span>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <span>来月以降は自動的に更新されます（毎月1日）</span>
+            </div>
+        </div>
+
+        <a href="https://liff.line.me/2009436433-Nh9ImTsd" class="btn">今すぐ予約する</a>
+        <a href="javascript:void(0)" class="btn-outline" onclick="closePage()">閉じる</a>
+    </div>
+
+    <script>
+        const LIFF_ID = "2009436433-Nh9ImTsd";
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            // URLパラメータからStripe session_idを取得してプラン名を表示
+            const params = new URLSearchParams(window.location.search);
+            const sessionId = params.get("session_id");
+
+            // LIFFが利用可能な場合は初期化
+            try {
+                await liff.init({ liffId: LIFF_ID });
+            } catch (e) {}
+        });
+
+        function closePage() {
+            if (typeof liff !== "undefined" && liff.isInClient()) {
+                liff.closeWindow();
+            } else {
+                window.close();
+            }
+        }
+    </script>
+</body>
+</html>
