@@ -1,251 +1,402 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SkateLab 予約システム</title>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <style>
-        :root { --primary-color: #00B900; --bg-color: #f4f5f7; --box-bg: #ffffff; --text-main: #333333; --border: #dddddd; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 15px; }
-        h2 { text-align: center; color: var(--text-main); font-size: 1.2rem; margin-bottom: 20px; }
-        .card { background: var(--box-bg); border-radius: 10px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        .form-group { margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
-        .form-group:last-child { border-bottom: none; padding-bottom: 0; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
-        input[type="date"], input[type="text"], select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 1rem; box-sizing: border-box; background-color: #fafafa; margin-bottom: 5px;}
-        .menu-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; border-left: 3px solid var(--primary-color); padding-left: 10px; }
-        .menu-row select { flex: 1; }
-        .menu-row .people-select { width: 80px; }
-        .remove-btn { color: white; background-color: #dc3545; border: none; border-radius: 50%; width: 25px; height: 25px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        button.add-btn { background-color: #e2e3e5; color: #383d41; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; width: 100%; margin-bottom: 15px; }
-        button.submit-btn { background-color: var(--primary-color); color: white; border: none; padding: 15px; border-radius: 5px; font-size: 1.1rem; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 4px 6px rgba(0, 185, 0, 0.2); }
-        button.submit-btn:disabled { background-color: #cccccc; cursor: not-allowed; box-shadow: none; }
-        #status-bar { text-align: center; padding: 10px; margin-bottom: 15px; border-radius: 5px; font-weight: bold; font-size: 0.9rem; }
-        .loading { background-color: #fff3cd; color: #856404; }
-        .success { background-color: #d4edda; color: #155724; }
-        .error { background-color: #f8d7da; color: #721c24; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SkateLab 予約システム</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+:root { --primary-color: #00B900; --bg-color: #f4f5f7; --box-bg: #ffffff; --text-main: #333333; --border: #dddddd; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 15px; }
+h2 { text-align: center; color: var(--text-main); font-size: 1.2rem; margin-bottom: 20px; }
+.card { background: var(--box-bg); border-radius: 10px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
+.form-group { margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 15px; }
+.form-group:last-child { border-bottom: none; padding-bottom: 0; }
+label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
+input[type="date"], input[type="text"], select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 1rem; box-sizing: border-box; background-color: #fafafa; margin-bottom: 5px;}
+textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+.menu-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; border-left: 3px solid var(--primary-color); padding-left: 10px; }
+.menu-row select { flex: 1; }
+.menu-row .people-select { width: 80px; }
+.remove-btn { color: white; background-color: #dc3545; border: none; border-radius: 50%; width: 25px; height: 25px; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+button.add-btn { background-color: #e2e3e5; color: #383d41; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; width: 100%; margin-bottom: 15px; }
+button.submit-btn { background-color: var(--primary-color); color: white; border: none; padding: 15px; border-radius: 5px; font-size: 1.1rem; font-weight: bold; width: 100%; cursor: pointer; box-shadow: 0 4px 6px rgba(0, 185, 0, 0.2); }
+button.submit-btn:disabled { background-color: #cccccc; cursor: not-allowed; box-shadow: none; }
+button.secondary-btn { background-color: #ffffff; color: var(--primary-color); border: 2px solid var(--primary-color); padding: 13px; border-radius: 5px; font-size: 1rem; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
+#status-bar { text-align: center; padding: 10px; margin-bottom: 15px; border-radius: 5px; font-weight: bold; font-size: 0.9rem; }
+.loading { background-color: #fff3cd; color: #856404; }
+.success { background-color: #d4edda; color: #155724; }
+.error { background-color: #f8d7da; color: #721c24; }
+.date-error { color: #dc3545; font-weight: bold; font-size: 0.85rem; margin-top: -2px; margin-bottom: 8px; display: none; }
+</style>
 </head>
 <body>
 
-    <div id="status-bar" class="loading">システムを初期化中...</div>
-    <h2>SkateLab 予約リクエスト</h2>
+<div id="status-bar" class="loading">システムを初期化中...</div>
+<h2 id="page-title">SkateLab 予約リクエスト</h2>
 
-    <form id="reservationForm" style="display: none;">
-        
-        <div class="card">
-            <h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📍 希望日時と場所</h3>
-            
-            <div class="form-group">
-                <label>第1候補 (必須)</label>
-                <input type="date" id="date1" required>
-                <select id="time1" required></select>
-                <select id="loc1" required onchange="toggleExtraFields(1)">
-                    <option value="">場所を選択してください</option>
-                    <option value="邦和スポーツランド">邦和スポーツランド</option>
-                    <option value="ガイシアリーナ">ガイシアリーナ</option>
-                    <option value="名古屋スポーツセンター">名古屋スポーツセンター (大須)</option>
-                    <option value="モリコロパーク">モリコロパーク</option>
-                    <option value="中京大学">中京大学</option>
-                    <option value="自宅">自宅（出張）</option>
-                    <option value="その他">その他（自由入力）</option>
-                </select>
-                <input type="text" id="locExtra1" placeholder="住所や場所名を入力" style="display:none;">
-            </div>
-            
-            <div class="form-group">
-                <label>第2候補 (任意)</label>
-                <input type="date" id="date2">
-                <select id="time2"></select>
-                <select id="loc2" onchange="toggleExtraFields(2)">
-                    <option value="">場所を選択してください</option>
-                    <option value="邦和スポーツランド">邦和スポーツランド</option>
-                    <option value="ガイシアリーナ">ガイシアリーナ</option>
-                    <option value="名古屋スポーツセンター">名古屋スポーツセンター (大須)</option>
-                    <option value="モリコロパーク">モリコロパーク</option>
-                    <option value="中京大学">中京大学</option>
-                    <option value="自宅">自宅（出張）</option>
-                    <option value="その他">その他（自由入力）</option>
-                </select>
-                <input type="text" id="locExtra2" placeholder="住所や場所名を入力" style="display:none;">
-            </div>
+<form id="reservationForm" style="display: none;">
 
-            <div class="form-group">
-                <label>第3候補 (任意)</label>
-                <input type="date" id="date3">
-                <select id="time3"></select>
-                <select id="loc3" onchange="toggleExtraFields(3)">
-                    <option value="">場所を選択してください</option>
-                    <option value="邦和スポーツランド">邦和スポーツランド</option>
-                    <option value="ガイシアリーナ">ガイシアリーナ</option>
-                    <option value="名古屋スポーツセンター">名古屋スポーツセンター (大須)</option>
-                    <option value="モリコロパーク">モリコロパーク</option>
-                    <option value="中京大学">中京大学</option>
-                    <option value="自宅">自宅（出張）</option>
-                    <option value="その他">その他（自由入力）</option>
-                </select>
-                <input type="text" id="locExtra3" placeholder="住所や場所名を入力" style="display:none;">
-            </div>
-        </div>
+<div class="card">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📍 希望日時と場所</h3>
 
-        <div class="card">
-            <h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">⛸️ メニューと人数</h3>
-            <div id="menuContainer"></div>
-            <button type="button" class="add-btn" onclick="addMenuRow()">＋ 別のメニューを追加する</button>
-        </div>
+<div class="form-group">
+<label>第1候補 (必須)</label>
+<input type="date" id="date1" required>
+<select id="time1" required></select>
+<select id="loc1" required onchange="toggleExtraFields(1)">
+<option value="">場所を選択してください</option>
+<option value="邦和スポーツランド">邦和スポーツランド</option>
+<option value="ガイシアリーナ">ガイシアリーナ</option>
+<option value="名古屋スポーツセンター">名古屋スポーツセンター (大須)</option>
+<option value="モリコロパーク">モリコロパーク</option>
+<option value="中京大学">中京大学</option>
+<option value="自宅">自宅（出張）</option>
+<option value="その他">その他（自由入力）</option>
+</select>
+<input type="text" id="locExtra1" placeholder="住所や場所名を入力" style="display:none;">
+</div>
 
-        <button type="submit" id="submitBtn" class="submit-btn">予約リクエストを送信する</button>
-    </form>
+<div class="form-group">
+<label>第2候補 (任意)</label>
+<input type="date" id="date2">
+<select id="time2"></select>
+<select id="loc2" onchange="toggleExtraFields(2)">
+<option value="">場所を選択してください</option>
+<option value="邦和スポーツランド">邦和スポーツランド</option>
+<option value="ガイシアリーナ">ガイシアリーナ</option>
+<option value="名古屋スポーツセンター">名古屋スポーツセンター (大須)</option>
+<option value="モリコロパーク">モリコロパーク</option>
+<option value="中京大学">中京大学</option>
+<option value="自宅">自宅（出張）</option>
+<option value="その他">その他（自由入力）</option>
+</select>
+<input type="text" id="locExtra2" placeholder="住所や場所名を入力" style="display:none;">
+</div>
 
-    <script>
-        const LIFF_ID = "2009436433-Nh9ImTsd";
-        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxT953bsPswsxiL5n7vXFtgkTLc6LeNcSXFsXy4ybKFbppLKcyvGlYYATRXmUWnd_Ww2A/exec";
-        
-        let currentUserProfile = null;
+<div class="form-group">
+<label>第3候補 (任意)</label>
+<input type="date" id="date3">
+<select id="time3"></select>
+<select id="loc3" onchange="toggleExtraFields(3)">
+<option value="">場所を選択してください</option>
+<option value="邦和スポーツランド">邦和スポーツランド</option>
+<option value="ガイシアリーナ">ガイシアリーナ</option>
+<option value="名古屋スポーツセンター">名古屋スポーツセンター (大須)</option>
+<option value="モリコロパーク">モリコロパーク</option>
+<option value="中京大学">中京大学</option>
+<option value="自宅">自宅（出張）</option>
+<option value="その他">その他（自由入力）</option>
+</select>
+<input type="text" id="locExtra3" placeholder="住所や場所名を入力" style="display:none;">
+</div>
+</div>
 
-        const menuOptions = [
-            { id: "M01", name: "通常機械研磨", price: "3000円" },
-            { id: "M02", name: "サイド調整", price: "1000円" },
-            { id: "M03", name: "コブ出し", price: "2000円" },
-            { id: "M04", name: "オーブンフィッティング", price: "4000円" },
-            { id: "M05", name: "エッジ取り付け", price: "4000円" },
-            { id: "M06", name: "エッジ位置調整", price: "2000円" },
-            { id: "M07", name: "インソール作成（パワー）", price: "18000円" },
-            { id: "M08", name: "インソール作成（バランス）", price: "8000円" },
-            { id: "M09", name: "ホッケー研磨", price: "2500円" },
-            { id: "M10", name: "スケート靴補強(片足)", price: "4000円" },
-            { id: "M11", name: "ベロ補強(片足)", price: "2000円" },
-            { id: "M12", name: "その他相談", price: "-" }
-        ];
+<div class="card">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">⛸️ メニューと人数</h3>
+<div id="menuContainer"></div>
+<button type="button" class="add-btn" onclick="addMenuRow()">＋ 別のメニューを追加する</button>
+</div>
 
-        document.addEventListener("DOMContentLoaded", () => {
-            initializeLiff();
-            generateTimeOptions();
-            addMenuRow(); 
-        });
+<button type="submit" id="submitBtn" class="submit-btn">予約リクエストを送信する</button>
+</form>
 
-        async function initializeLiff() {
-            try {
-                await liff.init({ liffId: LIFF_ID });
-                if (!liff.isLoggedIn()) { liff.login(); return; }
-                currentUserProfile = await liff.getProfile();
-                document.getElementById('status-bar').style.display = 'none';
-                document.getElementById('reservationForm').style.display = 'block';
-            } catch (error) {
-                showStatus('エラー: LINEの連携に失敗しました', 'error');
-            }
-        }
+<form id="takkyubinForm" style="display: none;">
 
-        function generateTimeOptions() {
-            let optionsHtml = '<option value="">時間を選択</option>';
-            for (let h = 11; h <= 21; h++) {
-                optionsHtml += `<option value="${h}:00">${h}:00</option>`;
-                optionsHtml += `<option value="${h}:30">${h}:30</option>`;
-            }
-            for(let i=1; i<=3; i++) document.getElementById('time'+i).innerHTML = optionsHtml;
-        }
+<div class="card">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📦 宅急便での発送</h3>
 
-        function toggleExtraFields(num) {
-            const locVal = document.getElementById(`loc${num}`).value;
-            const extraInput = document.getElementById(`locExtra${num}`);
-            if (locVal === '自宅' || locVal === 'その他') {
-                extraInput.style.display = 'block';
-                extraInput.required = true;
-            } else {
-                extraInput.style.display = 'none';
-                extraInput.required = false;
-                extraInput.value = '';
-            }
-        }
+<div class="form-group">
+<label>送り状番号</label>
+<input type="text" id="trackingNo" placeholder="送り状番号を入力" required>
+</div>
 
-        function addMenuRow() {
-            const container = document.getElementById('menuContainer');
-            const rowDiv = document.createElement('div');
-            rowDiv.className = 'menu-row';
+<div class="form-group">
+<label>到着予定日</label>
+<input type="date" id="arrivalDate" required onchange="checkArrivalDate()">
+<div id="arrivalDateError" class="date-error">この日は出張等のため受け取りできません。別の日をお選びください。</div>
+</div>
 
-            let menuSelect = `<select class="menu-select" required><option value="">メニューを選択</option>`;
-            menuOptions.forEach(m => menuSelect += `<option value="${m.id}">${m.name} (${m.price})</option>`);
-            menuSelect += `</select>`;
+<div class="form-group">
+<label>その他要望・メッセージ（任意）</label>
+<textarea id="takkyubinNote" placeholder="ご要望があればご記入ください"></textarea>
+</div>
+</div>
 
-            let peopleSelect = `<select class="people-select" required>`;
-            for(let i=1; i<=10; i++) peopleSelect += `<option value="${i}">${i}名</option>`;
-            peopleSelect += `</select>`;
+<button type="submit" id="takkyubinSubmitBtn" class="submit-btn">この内容で送信する</button>
+<button type="button" id="showAddressBtn" class="secondary-btn" onclick="requestTakkyubinAddress()">送り先を表示する（LINEに送信）</button>
+</form>
 
-            const removeBtn = container.children.length > 0 ? `<button type="button" class="remove-btn" onclick="this.parentElement.remove()">×</button>` : `<div style="width:25px;"></div>`;
-            rowDiv.innerHTML = menuSelect + peopleSelect + removeBtn;
-            container.appendChild(rowDiv);
-        }
+<script>
+const LIFF_ID = "2009436433-Nh9ImTsd";
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxT953bsPswsxiL5n7vXFtgkTLc6LeNcSXFsXy4ybKFbppLKcyvGlYYATRXmUWnd_Ww2A/exec";
 
-        function getCandidateData(num) {
-            const date = document.getElementById(`date${num}`).value;
-            const time = document.getElementById(`time${num}`).value;
-            const loc = document.getElementById(`loc${num}`).value;
-            const extra = document.getElementById(`locExtra${num}`).value;
-            
-            if (!date || !time || !loc) return null;
-            let finalLoc = (loc === '自宅' || loc === 'その他') ? `${loc}(${extra})` : loc;
-            return { date: date, time: time, location: finalLoc };
-        }
+const urlParams = new URLSearchParams(window.location.search);
+const PAGE_MODE = urlParams.get('mode') === 'takkyubin' ? 'takkyubin' : 'reservation';
 
-        document.getElementById('reservationForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-            submitBtn.innerText = "送信中...";
+let currentUserProfile = null;
+let busyTravelDates = [];
 
-            const menus = [];
-            document.querySelectorAll('.menu-row').forEach(row => {
-                const menuId = row.querySelector('.menu-select').value;
-                const people = row.querySelector('.people-select').value;
-                if(menuId) menus.push({ menuId: menuId, people: parseInt(people) });
-            });
+const menuOptions = [
+{ id: "M01", name: "通常機械研磨", price: "3000円" },
+{ id: "M02", name: "サイド調整", price: "1000円" },
+{ id: "M03", name: "コブ出し", price: "2000円" },
+{ id: "M04", name: "オーブンフィッティング", price: "4000円" },
+{ id: "M05", name: "エッジ取り付け", price: "4000円" },
+{ id: "M06", name: "エッジ位置調整", price: "2000円" },
+{ id: "M07", name: "インソール作成（パワー）", price: "18000円" },
+{ id: "M08", name: "インソール作成（バランス）", price: "8000円" },
+{ id: "M09", name: "ホッケー研磨", price: "2500円" },
+{ id: "M10", name: "スケート靴補強(片足)", price: "4000円" },
+{ id: "M11", name: "ベロ補強(片足)", price: "2000円" },
+{ id: "M12", name: "その他相談", price: "-" }
+];
 
-            const candidates = [];
-            for (let i = 1; i <= 3; i++) {
-                const data = getCandidateData(i);
-                if (data) candidates.push(data);
-            }
+document.addEventListener("DOMContentLoaded", () => {
+if (PAGE_MODE === 'takkyubin') {
+document.getElementById('page-title').innerText = 'SkateLab 宅急便発送';
+} else {
+generateTimeOptions();
+addMenuRow();
+}
+initializeLiff();
+});
 
-            const payload = {
-                action: "submit_reservation",
-                user: {
-                    userId: currentUserProfile ? currentUserProfile.userId : "Unknown",
-                    displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
-                },
-                candidates: candidates,
-                menus: menus
-            };
+async function initializeLiff() {
+try {
+await liff.init({ liffId: LIFF_ID });
+if (!liff.isLoggedIn()) { liff.login(); return; }
+currentUserProfile = await liff.getProfile();
+document.getElementById('status-bar').style.display = 'none';
 
-            try {
-                const response = await fetch(GAS_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await response.json();
-                
-                if(result.status === "success" || result.status === "pending") {
-                    document.getElementById('reservationForm').style.display = 'none';
-                    showStatus('仮予約リクエストを送信しました！LINEにて追ってご連絡いたします。', 'success');
-                } else {
-                    showStatus('エラー: ' + result.message, 'error');
-                    submitBtn.disabled = false;
-                    submitBtn.innerText = "予約リクエストを送信する";
-                }
-            } catch (error) {
-                showStatus('通信エラーが発生しました。', 'error');
-                submitBtn.disabled = false;
-                submitBtn.innerText = "予約リクエストを送信する";
-            }
-        });
+if (PAGE_MODE === 'takkyubin') {
+document.getElementById('takkyubinForm').style.display = 'block';
+loadBusyTravelDates();
+} else {
+document.getElementById('reservationForm').style.display = 'block';
+}
+} catch (error) {
+showStatus('エラー: LINEの連携に失敗しました', 'error');
+}
+}
 
-        function showStatus(message, className) {
-            const statusDiv = document.getElementById('status-bar');
-            statusDiv.style.display = 'block';
-            statusDiv.innerText = message;
-            statusDiv.className = className;
-        }
-    </script>
+function generateTimeOptions() {
+let optionsHtml = '<option value="">時間を選択</option>';
+for (let h = 11; h <= 21; h++) {
+optionsHtml += `<option value="${h}:00">${h}:00</option>`;
+optionsHtml += `<option value="${h}:30">${h}:30</option>`;
+}
+for(let i=1; i<=3; i++) document.getElementById('time'+i).innerHTML = optionsHtml;
+}
+
+function toggleExtraFields(num) {
+const locVal = document.getElementById(`loc${num}`).value;
+const extraInput = document.getElementById(`locExtra${num}`);
+if (locVal === '自宅' || locVal === 'その他') {
+extraInput.style.display = 'block';
+extraInput.required = true;
+} else {
+extraInput.style.display = 'none';
+extraInput.required = false;
+extraInput.value = '';
+}
+}
+
+function addMenuRow() {
+const container = document.getElementById('menuContainer');
+const rowDiv = document.createElement('div');
+rowDiv.className = 'menu-row';
+
+let menuSelect = `<select class="menu-select" required><option value="">メニューを選択</option>`;
+menuOptions.forEach(m => menuSelect += `<option value="${m.id}">${m.name} (${m.price})</option>`);
+menuSelect += `</select>`;
+
+let peopleSelect = `<select class="people-select" required>`;
+for(let i=1; i<=10; i++) peopleSelect += `<option value="${i}">${i}名</option>`;
+peopleSelect += `</select>`;
+
+const removeBtn = container.children.length > 0 ? `<button type="button" class="remove-btn" onclick="this.parentElement.remove()">×</button>` : `<div style="width:25px;"></div>`;
+rowDiv.innerHTML = menuSelect + peopleSelect + removeBtn;
+container.appendChild(rowDiv);
+}
+
+function getCandidateData(num) {
+const date = document.getElementById(`date${num}`).value;
+const time = document.getElementById(`time${num}`).value;
+const loc = document.getElementById(`loc${num}`).value;
+const extra = document.getElementById(`locExtra${num}`).value;
+
+if (!date || !time || !loc) return null;
+let finalLoc = (loc === '自宅' || loc === 'その他') ? `${loc}(${extra})` : loc;
+return { date: date, time: time, location: finalLoc };
+}
+
+document.getElementById('reservationForm').addEventListener('submit', async function(e) {
+e.preventDefault();
+const submitBtn = document.getElementById('submitBtn');
+submitBtn.disabled = true;
+submitBtn.innerText = "送信中...";
+
+const menus = [];
+document.querySelectorAll('.menu-row').forEach(row => {
+const menuId = row.querySelector('.menu-select').value;
+const people = row.querySelector('.people-select').value;
+if(menuId) menus.push({ menuId: menuId, people: parseInt(people) });
+});
+
+const candidates = [];
+for (let i = 1; i <= 3; i++) {
+const data = getCandidateData(i);
+if (data) candidates.push(data);
+}
+
+const payload = {
+action: "submit_reservation",
+user: {
+userId: currentUserProfile ? currentUserProfile.userId : "Unknown",
+displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
+},
+candidates: candidates,
+menus: menus
+};
+
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify(payload)
+});
+const result = await response.json();
+
+if(result.status === "success" || result.status === "pending") {
+document.getElementById('reservationForm').style.display = 'none';
+showStatus('仮予約リクエストを送信しました！LINEにて追ってご連絡いたします。', 'success');
+} else {
+showStatus('エラー: ' + result.message, 'error');
+submitBtn.disabled = false;
+submitBtn.innerText = "予約リクエストを送信する";
+}
+} catch (error) {
+showStatus('通信エラーが発生しました。', 'error');
+submitBtn.disabled = false;
+submitBtn.innerText = "予約リクエストを送信する";
+}
+});
+
+// ==========================================
+// 宅急便モード
+// ==========================================
+async function loadBusyTravelDates() {
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify({ action: "get_busy_travel_dates" })
+});
+const result = await response.json();
+if (result.status === "success") {
+busyTravelDates = result.dates || [];
+}
+} catch (error) {
+// 取得失敗時はチェックをスキップ（送信時にバックエンド側でも安全に処理される想定）
+busyTravelDates = [];
+}
+}
+
+function checkArrivalDate() {
+const dateVal = document.getElementById('arrivalDate').value;
+const errorDiv = document.getElementById('arrivalDateError');
+const submitBtn = document.getElementById('takkyubinSubmitBtn');
+
+if (busyTravelDates.includes(dateVal)) {
+errorDiv.style.display = 'block';
+submitBtn.disabled = true;
+} else {
+errorDiv.style.display = 'none';
+submitBtn.disabled = false;
+}
+}
+
+document.getElementById('takkyubinForm').addEventListener('submit', async function(e) {
+e.preventDefault();
+const submitBtn = document.getElementById('takkyubinSubmitBtn');
+submitBtn.disabled = true;
+submitBtn.innerText = "送信中...";
+
+const payload = {
+action: "submit_takkyubin",
+user: {
+userId: currentUserProfile ? currentUserProfile.userId : "Unknown",
+displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
+},
+trackingNo: document.getElementById('trackingNo').value,
+arrivalDate: document.getElementById('arrivalDate').value,
+note: document.getElementById('takkyubinNote').value
+};
+
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify(payload)
+});
+const result = await response.json();
+
+if(result.status === "success") {
+document.getElementById('takkyubinForm').style.display = 'none';
+showStatus('宅急便の発送情報を送信しました！LINEにて確認のご連絡をいたします。', 'success');
+} else {
+showStatus('エラー: ' + result.message, 'error');
+submitBtn.disabled = false;
+submitBtn.innerText = "この内容で送信する";
+}
+} catch (error) {
+showStatus('通信エラーが発生しました。', 'error');
+submitBtn.disabled = false;
+submitBtn.innerText = "この内容で送信する";
+}
+});
+
+async function requestTakkyubinAddress() {
+const btn = document.getElementById('showAddressBtn');
+btn.disabled = true;
+btn.innerText = "送信中...";
+
+const payload = {
+action: "get_takkyubin_address",
+user: {
+userId: currentUserProfile ? currentUserProfile.userId : "Unknown",
+displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
+}
+};
+
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify(payload)
+});
+const result = await response.json();
+
+if (result.status === "success") {
+showStatus('送り先住所をLINEに送信しました。', 'success');
+} else {
+showStatus('送り先情報の送信に失敗しました。', 'error');
+}
+} catch (error) {
+showStatus('通信エラーが発生しました。', 'error');
+} finally {
+btn.disabled = false;
+btn.innerText = "送り先を表示する（LINEに送信）";
+}
+}
+
+function showStatus(message, className) {
+const statusDiv = document.getElementById('status-bar');
+statusDiv.style.display = 'block';
+statusDiv.innerText = message;
+statusDiv.className = className;
+}
+</script>
 </body>
 </html>
