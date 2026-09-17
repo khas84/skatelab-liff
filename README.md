@@ -4,15 +4,32 @@ Android で GAS 配信 HTML の `liff.init` が止まる問題を避けるため
 
 ## URL
 
-- Pages（予約）: https://khas84.github.io/skatelab-liff/
-- 宅急便モード: https://khas84.github.io/skatelab-liff/?mode=takkyubin
+クエリ `mode` で画面を切り替えます。日付の基準は Asia/Tokyo です。
+
+- `mode=sameday` → 当日予約（日付は本日固定、第1候補のみ。送信 JSON に `mode: "sameday"`）
+- `mode=calendar` または未指定 / その他（`takkyubin` 以外）→ カレンダー予約（最短は翌日。第1〜第3候補。送信 JSON に `mode: "calendar"`）
+- `mode=takkyubin` → 宅急便発送（従来どおり）
+
+Pages:
+
+- 当日予約: https://khas84.github.io/skatelab-liff/?mode=sameday
+- カレンダー予約: https://khas84.github.io/skatelab-liff/?mode=calendar
+- 宅急便: https://khas84.github.io/skatelab-liff/?mode=takkyubin
+
+LIFF（`<LIFF_ID>` は `config.js` の値）:
+
+- https://liff.line.me/<LIFF_ID>?mode=sameday
+- https://liff.line.me/<LIFF_ID>?mode=calendar
+- https://liff.line.me/<LIFF_ID>?mode=takkyubin
 
 ## LINE Developers 設定
 
 LIFF Endpoint URL はすでに `https://khas84.github.io/skatelab-liff/` です。
 
 1. LIFF アプリの Endpoint URL を `https://khas84.github.io/skatelab-liff/` にする
-2. リッチメニューの宅急便は `https://khas84.github.io/skatelab-liff/?mode=takkyubin` を使う
+2. リッチメニューの当日予約は `https://khas84.github.io/skatelab-liff/?mode=sameday` を使う
+3. リッチメニューのカレンダー予約は `https://khas84.github.io/skatelab-liff/?mode=calendar` を使う（未指定もカレンダー）
+4. リッチメニューの宅急便は `https://khas84.github.io/skatelab-liff/?mode=takkyubin` を使う
 
 ## 設定ファイル
 
@@ -27,7 +44,7 @@ LIFF Endpoint URL はすでに `https://khas84.github.io/skatelab-liff/` です�
 
 Web アプリの `/exec` に JSON POST（`Content-Type: text/plain`）で次の action を送ります。`text/plain` は Apps Script の CORS 制約を避けるための指定です。
 
-- `submit_reservation`
+- `submit_reservation`（予約。`user` / `candidates` / `menus` に加え `mode` が `"sameday"` または `"calendar"`）
 - `get_busy_travel_dates`
 - `submit_takkyubin`
 - `get_takkyubin_address`
