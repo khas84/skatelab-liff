@@ -163,6 +163,7 @@ document.getElementById('page-title').innerText = 'SkateLab 宅急便発送';
 generateTimeOptions();
 addMenuRow();
 applyReservationMode();
+loadLocations();
 }
 initializeLiff();
 });
@@ -183,6 +184,64 @@ document.getElementById('reservationForm').style.display = 'block';
 } catch (error) {
 showStatus('エラー: LINEの連携に失敗しました', 'error');
 }
+}
+
+// ==========================================
+// 場所リスト（GAS の get_locations から取得。失敗時は HTML 内の固定リストをそのまま使う）
+// ==========================================
+const LOCATION_SELECT_IDS = ['loc1', 'loc2', 'loc3'];
+const LOCATION_FIXED_VALUES = ['', '自宅', 'その他'];
+const LOCATION_FETCH_TIMEOUT_MS = 5000;
+
+function escapeHtml(str) {
+return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function loadLocations() {
+let names = [];
+const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+const timer = setTimeout(() => { if (controller) controller.abort(); }, LOCATION_FETCH_TIMEOUT_MS);
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify({ action: "get_locations" }),
+signal: controller ? controller.signal : undefined
+});
+const result = await response.json();
+if (result && result.status === "success" && Array.isArray(result.locations)) {
+const seen = {};
+names = result.locations
+.map(n => String(n == null ? '' : n).trim())
+.filter(n => n && !LOCATION_FIXED_VALUES.includes(n) && !seen[n] && (seen[n] = true));
+}
+} catch (error) {
+// 取得失敗・タイムアウト時は固定リストのまま
+names = [];
+} finally {
+clearTimeout(timer);
+}
+if (names.length === 0) return; // 空なら固定リストを維持
+applyLocationOptions(names);
+}
+
+function applyLocationOptions(names) {
+const placeOptions = names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+LOCATION_SELECT_IDS.forEach((id, idx) => {
+const sel = document.getElementById(id);
+if (!sel) return;
+const current = sel.value;
+const fixed = [...sel.options].filter(o => LOCATION_FIXED_VALUES.includes(o.value));
+const head = fixed.filter(o => o.value === '').map(o => o.outerHTML).join('');
+const tail = fixed.filter(o => o.value !== '').map(o => o.outerHTML).join('');
+sel.innerHTML = head + placeOptions + tail;
+if ([...sel.options].some(o => o.value === current)) {
+sel.value = current;
+} else {
+sel.value = '';
+toggleExtraFields(idx + 1);
+}
+});
 }
 
 function generateTimeOptions() {
@@ -476,3 +535,4 @@ statusDiv.className = className;
 </script>
 </body>
 </html>
+
