@@ -31,6 +31,9 @@ button.secondary-btn { background-color: #ffffff; color: var(--primary-color); b
 .date-error { color: #dc3545; font-weight: bold; font-size: 0.85rem; margin-top: -2px; margin-bottom: 8px; display: none; }
 .fixed-date-note { font-size: 0.95rem; font-weight: bold; margin: 0 0 8px; color: var(--text-main); }
 .info-text { font-size: 0.9rem; line-height: 1.6; margin: 0 0 10px; white-space: pre-wrap; }
+.profile-note { font-size: 0.85rem; line-height: 1.6; margin: 4px 0 0; color: #555; }
+.profile-note a { color: var(--primary-color); font-weight: bold; }
+input[readonly] { background-color: #eeeeee; color: #555; }
 .summary-box { background: #f1f8e9; border-radius: 6px; padding: 10px; font-size: 0.9rem; line-height: 1.6; margin-bottom: 15px; white-space: pre-wrap; word-break: break-word; }
 </style>
 </head>
@@ -38,6 +41,38 @@ button.secondary-btn { background-color: #ffffff; color: var(--primary-color); b
 
 <div id="status-bar" class="loading">システムを初期化中...</div>
 <h2 id="page-title">SkateLab 予約リクエスト</h2>
+
+<div id="customerCard" class="card" style="display: none;">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">👤 お名前</h3>
+<div class="form-group">
+<label for="custName">お名前</label>
+<input type="text" id="custName" maxlength="50" placeholder="例：山田 太郎" autocomplete="name">
+<p id="custProfileNote" class="profile-note" style="display: none;"></p>
+</div>
+</div>
+
+<form id="registerForm" style="display: none;">
+<div class="card">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">👤 お名前とクラブ名の登録</h3>
+<p class="info-text">LINEの表示名だけでは、どなたか分からない場合があります。お手数ですが、お名前とクラブ名のご登録をお願いいたします。</p>
+<div class="form-group">
+<label for="regName">お名前 (必須)</label>
+<input type="text" id="regName" maxlength="50" placeholder="例：山田 太郎" autocomplete="name" required>
+</div>
+<div class="form-group">
+<label for="regClub">クラブ名 (必須)</label>
+<input type="text" id="regClub" maxlength="50" placeholder="例：〇〇スケートクラブ" required>
+<p class="profile-note">所属クラブがない場合は「なし」とご入力ください。</p>
+</div>
+</div>
+<button type="submit" id="regSubmitBtn" class="submit-btn">登録する</button>
+</form>
+
+<div id="registerDone" class="card" style="display: none;">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">✅ 登録が完了しました</h3>
+<p id="registerDoneText" class="info-text"></p>
+<button type="button" id="registerCloseBtn" class="submit-btn" onclick="closeLiffWindow()">閉じる</button>
+</div>
 
 <form id="reservationForm" style="display: none;">
 
@@ -177,7 +212,10 @@ const urlParams = new URLSearchParams(window.location.search);
 const modeParam = urlParams.get('mode');
 const PAGE_MODE = modeParam === 'takkyubin' ? 'takkyubin'
   : (modeParam === 'takkyubin_inquiry' ? 'takkyubin_inquiry'
-  : (modeParam === 'sameday' ? 'sameday' : 'calendar'));
+  : (modeParam === 'register' ? 'register'
+  : (modeParam === 'sameday' ? 'sameday' : 'calendar')));
+const REGISTER_NAME_MAX = 50;
+let myProfile = null;   // get_my_profile の結果（登録済みなら { registered: true, name, club }）
 // 宅急便：承認済みの問い合わせ ID（LINE でお送りしたリンクの &inq=TQ-…）
 const INQ_ID_RE = /^TQ-\d{14}-[0-9A-F]{4}$/;
 const INQ_ID = INQ_ID_RE.test(urlParams.get('inq') || '') ? urlParams.get('inq') : '';
@@ -202,7 +240,10 @@ let menuOptions = [
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
-if (PAGE_MODE === 'takkyubin') {
+if (PAGE_MODE === 'register') {
+document.title = 'お名前の登録';
+document.getElementById('page-title').innerText = 'SkateLab お名前の登録';
+} else if (PAGE_MODE === 'takkyubin') {
 document.getElementById('page-title').innerText = 'SkateLab 宅急便発送';
 } else if (PAGE_MODE === 'takkyubin_inquiry') {
 document.title = '宅急便のお問い合わせ';
@@ -226,14 +267,21 @@ if (!liff.isLoggedIn()) { liff.login(); return; }
 currentUserProfile = await liff.getProfile();
 document.getElementById('status-bar').style.display = 'none';
 
-if (PAGE_MODE === 'takkyubin') {
+if (PAGE_MODE === 'register') {
+document.getElementById('registerForm').style.display = 'block';
+loadMyProfile();
+} else if (PAGE_MODE === 'takkyubin') {
 loadBusyTravelDates();
 initShipForm();
 } else if (PAGE_MODE === 'takkyubin_inquiry') {
 document.getElementById('takkyubinInquiryForm').style.display = 'block';
+document.getElementById('customerCard').style.display = 'block';
 loadBusyTravelDates();
+loadMyProfile();
 } else {
 document.getElementById('reservationForm').style.display = 'block';
+document.getElementById('customerCard').style.display = 'block';
+loadMyProfile();
 }
 } catch (error) {
 showStatus('エラー: LINEの連携に失敗しました', 'error');
@@ -451,6 +499,7 @@ displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
 candidates: candidates,
 menus: menus
 };
+addCustomerName(payload);
 
 try {
 const response = await fetch(GAS_API_URL, {
@@ -462,6 +511,7 @@ const result = await response.json();
 
 if(result.status === "success" || result.status === "pending") {
 document.getElementById('reservationForm').style.display = 'none';
+document.getElementById('customerCard').style.display = 'none';
 showStatus('仮予約リクエストを送信しました！LINEにて追ってご連絡いたします。', 'success');
 } else {
 showStatus('エラー: ' + result.message, 'error');
@@ -552,6 +602,7 @@ desiredDate: desiredDate,
 menus: menus,
 note: document.getElementById('inqNote').value
 };
+addCustomerName(payload);
 
 try {
 const response = await fetch(GAS_API_URL, {
@@ -562,6 +613,7 @@ body: JSON.stringify(payload)
 const result = await response.json();
 if (result.status === "success") {
 document.getElementById('takkyubinInquiryForm').style.display = 'none';
+document.getElementById('customerCard').style.display = 'none';
 showStatus('お問い合わせを送信しました！確認のうえLINEでご連絡いたします。発送はご連絡をお待ちください。', 'success');
 } else {
 showStatus('エラー: ' + result.message, 'error');
@@ -742,6 +794,122 @@ showStatus('通信エラーが発生しました。', 'error');
 btn.disabled = false;
 btn.innerText = "送り先を表示する（LINEに送信）";
 }
+}
+
+// ==========================================
+// お名前・クラブ名の登録（mode=register）と、予約フォームのお名前の初期値
+// ==========================================
+function getIdTokenSafe() {
+try { return (liff.getIDToken && liff.getIDToken()) || ''; } catch (e) { return ''; }
+}
+
+function liffUserPayload() {
+return {
+userId: currentUserProfile ? currentUserProfile.userId : "Unknown",
+displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
+};
+}
+
+function withIdToken(body) {
+const t = getIdTokenSafe();
+if (t) body.idToken = t;
+return body;
+}
+
+// 予約・宅急便お問い合わせの送信データに「お名前」を追加（入力があるときだけ）
+function addCustomerName(payload) {
+const el = document.getElementById('custName');
+const v = el ? el.value.trim().slice(0, REGISTER_NAME_MAX) : '';
+if (v) payload.customerName = v;
+return payload;
+}
+
+function registerLink(text) {
+return `<a href="${escapeHtml(window.location.pathname + '?mode=register')}">${escapeHtml(text)}</a>`;
+}
+
+async function loadMyProfile() {
+let result = null;
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify(withIdToken({ action: "get_my_profile", user: liffUserPayload() }))
+});
+result = await response.json();
+} catch (error) {
+result = null;
+}
+myProfile = (result && result.status === "success" && result.registered) ? result : null;
+applyMyProfile();
+}
+
+function applyMyProfile() {
+if (PAGE_MODE === 'register') {
+if (!myProfile) return;
+const n = document.getElementById('regName'), c = document.getElementById('regClub');
+if (!n.value) n.value = myProfile.name || '';
+if (!c.value) c.value = myProfile.club || '';
+document.getElementById('regSubmitBtn').innerText = '登録内容を更新する';
+return;
+}
+const input = document.getElementById('custName');
+const note = document.getElementById('custProfileNote');
+if (!input || !note) return;
+note.style.display = 'block';
+if (myProfile) {
+input.value = myProfile.name || '';
+input.readOnly = true;
+note.innerHTML = `ご登録のお名前で送信します（クラブ名: ${escapeHtml(myProfile.club || 'なし')}）。` + registerLink('登録内容を変更する');
+} else {
+input.readOnly = false;
+note.innerHTML = '任意です。' + registerLink('お名前とクラブ名の登録はこちら') + '（次回から入力不要になります）';
+}
+}
+
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
+e.preventDefault();
+const name = document.getElementById('regName').value.trim();
+const club = document.getElementById('regClub').value.trim();
+if (!name) { showStatus('お名前を入力してください。', 'error'); return; }
+if (!club) { showStatus('クラブ名を入力してください（所属がない場合は「なし」）。', 'error'); return; }
+if (name.length > REGISTER_NAME_MAX || club.length > REGISTER_NAME_MAX) { showStatus(`お名前・クラブ名は${REGISTER_NAME_MAX}文字以内で入力してください。`, 'error'); return; }
+const btn = document.getElementById('regSubmitBtn');
+const label = btn.innerText;
+btn.disabled = true;
+btn.innerText = "送信中...";
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify(withIdToken({ action: "register_customer", user: liffUserPayload(), name: name, club: club }))
+});
+const result = await response.json();
+if (result.status === "success") {
+document.getElementById('registerForm').style.display = 'none';
+document.getElementById('status-bar').style.display = 'none';
+document.getElementById('registerDone').style.display = 'block';
+document.getElementById('registerDoneText').innerText =
+`お名前: ${result.name || name}\nクラブ名: ${result.club || club}\n\nご登録ありがとうございます。LINEのトーク画面にお戻りください。`;
+if (!canCloseLiff()) document.getElementById('registerCloseBtn').style.display = 'none';
+} else {
+showStatus('エラー: ' + result.message, 'error');
+btn.disabled = false;
+btn.innerText = label;
+}
+} catch (error) {
+showStatus('通信エラーが発生しました。', 'error');
+btn.disabled = false;
+btn.innerText = label;
+}
+});
+
+function canCloseLiff() {
+try { return !!(liff.isInClient && liff.isInClient()); } catch (e) { return false; }
+}
+
+function closeLiffWindow() {
+try { liff.closeWindow(); } catch (e) { /* LINE外のブラウザでは閉じられない */ }
 }
 
 function showStatus(message, className) {
