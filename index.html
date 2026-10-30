@@ -30,6 +30,8 @@ button.secondary-btn { background-color: #ffffff; color: var(--primary-color); b
 .error { background-color: #f8d7da; color: #721c24; }
 .date-error { color: #dc3545; font-weight: bold; font-size: 0.85rem; margin-top: -2px; margin-bottom: 8px; display: none; }
 .fixed-date-note { font-size: 0.95rem; font-weight: bold; margin: 0 0 8px; color: var(--text-main); }
+.info-text { font-size: 0.9rem; line-height: 1.6; margin: 0 0 10px; white-space: pre-wrap; }
+.summary-box { background: #f1f8e9; border-radius: 6px; padding: 10px; font-size: 0.9rem; line-height: 1.6; margin-bottom: 15px; white-space: pre-wrap; word-break: break-word; }
 </style>
 </head>
 <body>
@@ -104,10 +106,47 @@ button.secondary-btn { background-color: #ffffff; color: var(--primary-color); b
 <button type="submit" id="submitBtn" class="submit-btn">予約リクエストを送信する</button>
 </form>
 
+<form id="takkyubinInquiryForm" style="display: none;">
+
+<div class="card">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📦 宅急便のお問い合わせ</h3>
+<p class="info-text">到着希望日と作業メニューをお送りください。作業できるか確認のうえ、送り状番号・到着予定日の入力フォームをLINEでお送りします。
+※ご連絡をお待ちいただいてから発送をお願いいたします。</p>
+
+<div class="form-group">
+<label>到着希望日 (必須)</label>
+<input type="date" id="inqDesiredDate" required onchange="checkInquiryDate()">
+<div id="inqDateError" class="date-error">この日は出張等のため受け取りできません。別の日をお選びください。</div>
+</div>
+</div>
+
+<div class="card">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">⛸️ 作業メニューと人数</h3>
+<div id="inqMenuContainer"></div>
+<button type="button" class="add-btn" onclick="addMenuRow('inqMenuContainer')">＋ 別のメニューを追加する</button>
+</div>
+
+<div class="card">
+<div class="form-group">
+<label>その他要望・メッセージ（任意）</label>
+<textarea id="inqNote" maxlength="500" placeholder="ご要望があればご記入ください"></textarea>
+</div>
+</div>
+
+<button type="submit" id="inqSubmitBtn" class="submit-btn">お問い合わせを送信する</button>
+</form>
+
+<div id="takkyubinGate" class="card" style="display: none;">
+<h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📦 宅急便での発送</h3>
+<p id="takkyubinGateText" class="info-text"></p>
+<button type="button" id="goInquiryBtn" class="submit-btn" style="display: none;" onclick="goToInquiry()">宅急便のお問い合わせへ</button>
+</div>
+
 <form id="takkyubinForm" style="display: none;">
 
 <div class="card">
 <h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">📦 宅急便での発送</h3>
+<div id="inquirySummary" class="summary-box" style="display: none;"></div>
 
 <div class="form-group">
 <label>送り状番号</label>
@@ -136,12 +175,18 @@ const GAS_API_URL = (window.SKATELAB_CONFIG && window.SKATELAB_CONFIG.GAS_API_UR
 
 const urlParams = new URLSearchParams(window.location.search);
 const modeParam = urlParams.get('mode');
-const PAGE_MODE = modeParam === 'takkyubin' ? 'takkyubin' : (modeParam === 'sameday' ? 'sameday' : 'calendar');
+const PAGE_MODE = modeParam === 'takkyubin' ? 'takkyubin'
+  : (modeParam === 'takkyubin_inquiry' ? 'takkyubin_inquiry'
+  : (modeParam === 'sameday' ? 'sameday' : 'calendar'));
+// 宅急便：承認済みの問い合わせ ID（LINE でお送りしたリンクの &inq=TQ-…）
+const INQ_ID_RE = /^TQ-\d{14}-[0-9A-F]{4}$/;
+const INQ_ID = INQ_ID_RE.test(urlParams.get('inq') || '') ? urlParams.get('inq') : '';
+let approvedInquiry = null;
 
 let currentUserProfile = null;
 let busyTravelDates = [];
 
-const menuOptions = [
+let menuOptions = [
 { id: "M01", name: "通常機械研磨", price: "3000円" },
 { id: "M02", name: "サイド調整", price: "1000円" },
 { id: "M03", name: "コブ出し", price: "2000円" },
@@ -159,6 +204,12 @@ const menuOptions = [
 document.addEventListener("DOMContentLoaded", () => {
 if (PAGE_MODE === 'takkyubin') {
 document.getElementById('page-title').innerText = 'SkateLab 宅急便発送';
+} else if (PAGE_MODE === 'takkyubin_inquiry') {
+document.title = '宅急便のお問い合わせ';
+document.getElementById('page-title').innerText = 'SkateLab 宅急便のお問い合わせ';
+document.getElementById('inqDesiredDate').min = getTokyoYmd(1);
+addMenuRow('inqMenuContainer');
+loadMenus();
 } else {
 generateTimeOptions();
 addMenuRow();
@@ -176,7 +227,10 @@ currentUserProfile = await liff.getProfile();
 document.getElementById('status-bar').style.display = 'none';
 
 if (PAGE_MODE === 'takkyubin') {
-document.getElementById('takkyubinForm').style.display = 'block';
+loadBusyTravelDates();
+initShipForm();
+} else if (PAGE_MODE === 'takkyubin_inquiry') {
+document.getElementById('takkyubinInquiryForm').style.display = 'block';
 loadBusyTravelDates();
 } else {
 document.getElementById('reservationForm').style.display = 'block';
@@ -320,14 +374,17 @@ extraInput.value = '';
 }
 }
 
-function addMenuRow() {
-const container = document.getElementById('menuContainer');
+function menuOptionsHtml() {
+return `<option value="">メニューを選択</option>` +
+menuOptions.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)} (${escapeHtml(m.price)})</option>`).join('');
+}
+
+function addMenuRow(containerId) {
+const container = document.getElementById(containerId || 'menuContainer');
 const rowDiv = document.createElement('div');
 rowDiv.className = 'menu-row';
 
-let menuSelect = `<select class="menu-select" required><option value="">メニューを選択</option>`;
-menuOptions.forEach(m => menuSelect += `<option value="${m.id}">${m.name} (${m.price})</option>`);
-menuSelect += `</select>`;
+let menuSelect = `<select class="menu-select" required>${menuOptionsHtml()}</select>`;
 
 let peopleSelect = `<select class="people-select" required>`;
 for(let i=1; i<=10; i++) peopleSelect += `<option value="${i}">${i}名</option>`;
@@ -419,6 +476,162 @@ submitBtn.innerText = reservationSubmitLabel();
 });
 
 // ==========================================
+// メニュー（GAS の get_menus から取得。失敗時は上の固定リストのまま）※宅急便お問い合わせで使用
+// ==========================================
+async function loadMenus() {
+let list = [];
+const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+const timer = setTimeout(() => { if (controller) controller.abort(); }, LOCATION_FETCH_TIMEOUT_MS);
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify({ action: "get_menus" }),
+signal: controller ? controller.signal : undefined
+});
+const result = await response.json();
+if (result && result.status === "success" && Array.isArray(result.menus)) {
+const seen = {};
+list = result.menus
+.map(m => ({ id: String((m && m.menuId) || '').trim(), name: String((m && m.name) || '').trim(), price: Number(m && m.price) || 0, note: String((m && m.note) || '').trim() }))
+.filter(m => m.id && m.name && !seen[m.id] && (seen[m.id] = true))
+.map(m => ({ id: m.id, name: m.name + (m.note && m.note.length <= 6 ? `(${m.note})` : ''), price: m.price > 0 ? `${m.price}円` : '-' }));
+}
+} catch (error) {
+list = [];
+} finally {
+clearTimeout(timer);
+}
+if (list.length === 0) return; // 固定リストを維持
+menuOptions = list;
+document.querySelectorAll('#inqMenuContainer .menu-select').forEach(sel => {
+const current = sel.value;
+sel.innerHTML = menuOptionsHtml();
+sel.value = menuOptions.some(m => m.id === current) ? current : '';
+});
+}
+
+// ==========================================
+// 宅急便お問い合わせモード（mode=takkyubin_inquiry）
+// ==========================================
+function checkInquiryDate() {
+const dateVal = document.getElementById('inqDesiredDate').value;
+const busy = busyTravelDates.includes(dateVal);
+document.getElementById('inqDateError').style.display = busy ? 'block' : 'none';
+document.getElementById('inqSubmitBtn').disabled = busy;
+}
+
+document.getElementById('takkyubinInquiryForm').addEventListener('submit', async function(e) {
+e.preventDefault();
+const submitBtn = document.getElementById('inqSubmitBtn');
+const desiredDate = document.getElementById('inqDesiredDate').value;
+if (!desiredDate || desiredDate <= getTokyoYmd(0)) {
+showStatus('到着希望日は明日以降の日付を選択してください。', 'error');
+return;
+}
+const menus = [];
+document.querySelectorAll('#inqMenuContainer .menu-row').forEach(row => {
+const menuId = row.querySelector('.menu-select').value;
+const people = row.querySelector('.people-select').value;
+if (menuId) menus.push({ menuId: menuId, people: parseInt(people, 10) });
+});
+if (menus.length === 0) {
+showStatus('作業メニューを選択してください。', 'error');
+return;
+}
+submitBtn.disabled = true;
+submitBtn.innerText = "送信中...";
+
+const payload = {
+action: "submit_takkyubin_inquiry",
+user: {
+userId: currentUserProfile ? currentUserProfile.userId : "Unknown",
+displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
+},
+desiredDate: desiredDate,
+menus: menus,
+note: document.getElementById('inqNote').value
+};
+
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify(payload)
+});
+const result = await response.json();
+if (result.status === "success") {
+document.getElementById('takkyubinInquiryForm').style.display = 'none';
+showStatus('お問い合わせを送信しました！確認のうえLINEでご連絡いたします。発送はご連絡をお待ちください。', 'success');
+} else {
+showStatus('エラー: ' + result.message, 'error');
+submitBtn.disabled = false;
+submitBtn.innerText = "お問い合わせを送信する";
+}
+} catch (error) {
+showStatus('通信エラーが発生しました。', 'error');
+submitBtn.disabled = false;
+submitBtn.innerText = "お問い合わせを送信する";
+}
+});
+
+function goToInquiry() {
+window.location.href = window.location.pathname + '?mode=takkyubin_inquiry';
+}
+
+function showTakkyubinGate(text, showInquiryButton) {
+document.getElementById('takkyubinForm').style.display = 'none';
+document.getElementById('takkyubinGate').style.display = 'block';
+document.getElementById('takkyubinGateText').innerText = text;
+document.getElementById('goInquiryBtn').style.display = showInquiryButton ? 'block' : 'none';
+}
+
+// 送り状フォーム（mode=takkyubin）：承認済みの問い合わせ（&inq=）がある場合だけ表示
+async function initShipForm() {
+if (!INQ_ID) {
+showTakkyubinGate('宅急便で発送される前に、まず「宅急便のお問い合わせ」から到着希望日と作業メニューをお送りください。\n作業できるか確認のうえ、このフォームのリンクをLINEでお送りします。', true);
+return;
+}
+showStatus('お問い合わせを確認中...', 'loading');
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+body: JSON.stringify({
+action: "get_takkyubin_inquiry",
+inqId: INQ_ID,
+user: { userId: currentUserProfile ? currentUserProfile.userId : "Unknown" }
+})
+});
+const result = await response.json();
+document.getElementById('status-bar').style.display = 'none';
+if (result.status !== "success" || !result.inquiry) {
+showTakkyubinGate('お問い合わせが見つかりませんでした。LINEでお送りしたリンクから開いているか、ご確認ください。\nお問い合わせがまだの場合は、こちらからお送りください。', true);
+return;
+}
+const q = result.inquiry;
+if (q.status === '承認') {
+approvedInquiry = q;
+const box = document.getElementById('inquirySummary');
+box.style.display = 'block';
+box.innerHTML = `<strong>承認済みのお問い合わせ</strong>\n到着日: ${escapeHtml(q.approvedDate)}\nメニュー: ${escapeHtml(q.menuDetails)}\n料金目安: ${escapeHtml(q.totalPrice)}円`;
+const dateInput = document.getElementById('arrivalDate');
+if (q.approvedDate) dateInput.value = q.approvedDate;  // 承認日をあらかじめ入力（変更可）
+document.getElementById('takkyubinForm').style.display = 'block';
+checkArrivalDate();
+} else if (q.status === '問い合わせ中') {
+showTakkyubinGate('このお問い合わせは、ただいま代表が確認中です。\n確認ができましたらLINEでご連絡いたします。', false);
+} else if (q.status === '発送済み') {
+showTakkyubinGate('このお問い合わせの送り状番号は、すでに送信済みです。ありがとうございました。', false);
+} else {
+showTakkyubinGate('このお問い合わせはお受けできませんでした。別の日程をご希望の場合は、改めてお問い合わせください。', true);
+}
+} catch (error) {
+showTakkyubinGate('お問い合わせを確認できませんでした。通信状況をご確認のうえ、もう一度開いてください。', false);
+}
+}
+
+// ==========================================
 // 宅急便モード
 // ==========================================
 async function loadBusyTravelDates() {
@@ -431,6 +644,8 @@ body: JSON.stringify({ action: "get_busy_travel_dates" })
 const result = await response.json();
 if (result.status === "success") {
 busyTravelDates = result.dates || [];
+if (PAGE_MODE === 'takkyubin_inquiry') checkInquiryDate();
+if (PAGE_MODE === 'takkyubin' && approvedInquiry) checkArrivalDate();
 }
 } catch (error) {
 // 取得失敗時はチェックをスキップ（送信時にバックエンド側でも安全に処理される想定）
@@ -443,7 +658,9 @@ const dateVal = document.getElementById('arrivalDate').value;
 const errorDiv = document.getElementById('arrivalDateError');
 const submitBtn = document.getElementById('takkyubinSubmitBtn');
 
-if (busyTravelDates.includes(dateVal)) {
+// 代表が承認した到着日は、出張予定の日でも選べる（代表が確認済みのため）
+const isApprovedDate = approvedInquiry && dateVal && dateVal === approvedInquiry.approvedDate;
+if (busyTravelDates.includes(dateVal) && !isApprovedDate) {
 errorDiv.style.display = 'block';
 submitBtn.disabled = true;
 } else {
@@ -466,7 +683,8 @@ displayName: currentUserProfile ? currentUserProfile.displayName : "Guest"
 },
 trackingNo: document.getElementById('trackingNo').value,
 arrivalDate: document.getElementById('arrivalDate').value,
-note: document.getElementById('takkyubinNote').value
+note: document.getElementById('takkyubinNote').value,
+inqId: INQ_ID
 };
 
 try {
