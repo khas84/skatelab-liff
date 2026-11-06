@@ -9,18 +9,24 @@ Android で GAS 配信 HTML の `liff.init` が止まる問題を避けるため
 - `mode=sameday` → 当日予約（日付は本日固定、第1候補のみ。送信 JSON に `mode: "sameday"`）
 - `mode=calendar` または未指定 / その他（`takkyubin` 以外）→ カレンダー予約（最短は翌日。第1〜第3候補。送信 JSON に `mode: "calendar"`）
 - `mode=takkyubin` → 宅急便発送（従来どおり）
+- `mode=history_work` → 過去の作業履歴（LINEログイン必須。試験中は管理者だけ）
+- `mode=history_talk` → 過去の会話履歴（同じ）
 
 Pages:
 
 - 当日予約: https://khas84.github.io/skatelab-liff/?mode=sameday
 - カレンダー予約: https://khas84.github.io/skatelab-liff/?mode=calendar
 - 宅急便: https://khas84.github.io/skatelab-liff/?mode=takkyubin
+- 作業履歴: https://khas84.github.io/skatelab-liff/?mode=history_work
+- 会話履歴: https://khas84.github.io/skatelab-liff/?mode=history_talk
 
 LIFF（`<LIFF_ID>` は `config.js` の値）:
 
 - https://liff.line.me/<LIFF_ID>?mode=sameday
 - https://liff.line.me/<LIFF_ID>?mode=calendar
 - https://liff.line.me/<LIFF_ID>?mode=takkyubin
+- https://liff.line.me/<LIFF_ID>?mode=history_work
+- https://liff.line.me/<LIFF_ID>?mode=history_talk
 
 ## LINE Developers 設定
 
@@ -48,3 +54,8 @@ Web アプリの `/exec` に JSON POST（`Content-Type: text/plain`）で次の 
 - `get_busy_travel_dates`
 - `submit_takkyubin`
 - `get_takkyubin_address`
+- `get_my_history`（`mode` は `work` または `talk`、`page`、`pageSize`、`idToken`。ユーザーIDは送りません。トークンは URL に付けません）
+
+履歴画面は LIFF の ID トークンをサーバが検証したあとだけ表示します。試験中の中身は管理者だけです。
+
+テスト: `node --test`
