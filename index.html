@@ -6,6 +6,8 @@
 <title>SkateLab 予約システム</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="config.js"></script>
+<script src="page-mode.js"></script>
+<script src="history-view.js"></script>
 <style>
 :root { --primary-color: #00B900; --bg-color: #f4f5f7; --box-bg: #ffffff; --text-main: #333333; --border: #dddddd; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding: 15px; }
@@ -35,12 +37,44 @@ button.secondary-btn { background-color: #ffffff; color: var(--primary-color); b
 .profile-note a { color: var(--primary-color); font-weight: bold; }
 input[readonly] { background-color: #eeeeee; color: #555; }
 .summary-box { background: #f1f8e9; border-radius: 6px; padding: 10px; font-size: 0.9rem; line-height: 1.6; margin-bottom: 15px; white-space: pre-wrap; word-break: break-word; }
+.history-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.history-tabs a { flex: 1; text-align: center; text-decoration: none; padding: 10px 6px; border-radius: 8px; border: 1px solid var(--border); color: var(--text-main); background: #fff; font-weight: bold; font-size: 0.85rem; }
+.history-tabs a[aria-current="page"] { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+.history-banner { background: #fff8e1; color: #6d4c00; border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; font-weight: bold; margin: 0 0 12px; }
+.history-status { text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9rem; margin-bottom: 12px; }
+.history-status.loading { background: #fff3cd; color: #856404; }
+.history-status.error { background: #f8d7da; color: #721c24; }
+.history-status.empty { background: #fff; color: #555; }
+.history-card { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 4px solid #607d8b; }
+.history-card.history-work { border-left-color: var(--primary-color); }
+.history-meta { margin: 0 0 6px; font-size: 0.8rem; color: #666; font-weight: bold; }
+.history-speaker { color: var(--text-main); }
+.history-body { margin: 0; font-size: 0.95rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.history-pager { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin: 12px 0 24px; }
+button.history-nav { background: #fff; color: var(--primary-color); border: 2px solid var(--primary-color); padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; min-width: 72px; }
+button.history-nav:disabled { border-color: #ccc; color: #999; cursor: not-allowed; }
+#historyPageLabel { font-size: 0.85rem; white-space: nowrap; }
 </style>
 </head>
 <body>
 
 <div id="status-bar" class="loading">システムを初期化中...</div>
 <h2 id="page-title">SkateLab 予約リクエスト</h2>
+
+<div id="historyView" style="display: none;">
+<p id="historyBanner" class="history-banner" style="display: none;"></p>
+<nav class="history-tabs" aria-label="履歴の種類">
+<a id="tabWork" href="?mode=history_work">過去の作業履歴</a>
+<a id="tabTalk" href="?mode=history_talk">過去の会話履歴</a>
+</nav>
+<div id="historyStatus" class="history-status" role="status"></div>
+<div id="historyList" aria-live="polite"></div>
+<div id="historyPager" class="history-pager" style="display: none;">
+<button type="button" id="historyPrev" class="history-nav">前へ</button>
+<span id="historyPageLabel"></span>
+<button type="button" id="historyNext" class="history-nav">次へ</button>
+</div>
+</div>
 
 <div id="customerCard" class="card" style="display: none;">
 <h3 style="font-size: 1rem; margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">👤 お名前</h3>
@@ -210,10 +244,7 @@ const GAS_API_URL = (window.SKATELAB_CONFIG && window.SKATELAB_CONFIG.GAS_API_UR
 
 const urlParams = new URLSearchParams(window.location.search);
 const modeParam = urlParams.get('mode');
-const PAGE_MODE = modeParam === 'takkyubin' ? 'takkyubin'
-  : (modeParam === 'takkyubin_inquiry' ? 'takkyubin_inquiry'
-  : (modeParam === 'register' ? 'register'
-  : (modeParam === 'sameday' ? 'sameday' : 'calendar')));
+const PAGE_MODE = resolvePageMode(modeParam);
 const REGISTER_NAME_MAX = 50;
 let myProfile = null;   // get_my_profile の結果（登録済みなら { registered: true, name, club }）
 // 宅急便：承認済みの問い合わせ ID（LINE でお送りしたリンクの &inq=TQ-…）
@@ -251,6 +282,12 @@ document.getElementById('page-title').innerText = 'SkateLab 宅急便のお問�
 document.getElementById('inqDesiredDate').min = getTokyoYmd(1);
 addMenuRow('inqMenuContainer');
 loadMenus();
+} else if (isHistoryMode(PAGE_MODE)) {
+document.getElementById('status-bar').style.display = 'none';
+document.title = PAGE_MODE === 'history_talk' ? '過去の会話履歴' : '過去の作業履歴';
+document.getElementById('page-title').innerText = document.title;
+document.getElementById('historyView').style.display = 'block';
+markHistoryTabs();
 } else {
 generateTimeOptions();
 addMenuRow();
@@ -261,12 +298,21 @@ initializeLiff();
 });
 
 async function initializeLiff() {
+if (isHistoryMode(PAGE_MODE) && allowLocalFixture(location.hostname, urlParams.get('fixture'))) {
+historyPage = 1;
+paintHistory(describeHistoryView(demoHistoryState(PAGE_MODE, historyPage)));
+return;
+}
 try {
 await liff.init({ liffId: LIFF_ID });
 if (!liff.isLoggedIn()) { liff.login(); return; }
 currentUserProfile = await liff.getProfile();
 document.getElementById('status-bar').style.display = 'none';
 
+if (isHistoryMode(PAGE_MODE)) {
+loadHistory(1);
+return;
+}
 if (PAGE_MODE === 'register') {
 document.getElementById('registerForm').style.display = 'block';
 loadMyProfile();
@@ -284,6 +330,10 @@ document.getElementById('customerCard').style.display = 'block';
 loadMyProfile();
 }
 } catch (error) {
+if (isHistoryMode(PAGE_MODE)) {
+paintHistory(describeHistoryView({ phase: 'error', code: 'unauthorized' }));
+return;
+}
 showStatus('エラー: LINEの連携に失敗しました', 'error');
 }
 }
@@ -802,6 +852,90 @@ btn.innerText = "送り先を表示する（LINEに送信）";
 function getIdTokenSafe() {
 try { return (liff.getIDToken && liff.getIDToken()) || ''; } catch (e) { return ''; }
 }
+
+let historyPage = 1;
+
+function markHistoryTabs() {
+const work = document.getElementById('tabWork');
+const talk = document.getElementById('tabTalk');
+work.href = historyModeHref(location.pathname, 'history_work', location.hostname, urlParams.get('fixture'));
+talk.href = historyModeHref(location.pathname, 'history_talk', location.hostname, urlParams.get('fixture'));
+work.setAttribute('aria-current', PAGE_MODE === 'history_work' ? 'page' : 'false');
+talk.setAttribute('aria-current', PAGE_MODE === 'history_talk' ? 'page' : 'false');
+}
+
+function paintHistory(view) {
+const banner = document.getElementById('historyBanner');
+const status = document.getElementById('historyStatus');
+const list = document.getElementById('historyList');
+const pager = document.getElementById('historyPager');
+banner.textContent = view.banner || '';
+banner.style.display = view.banner ? 'block' : 'none';
+status.textContent = view.statusText || '';
+status.style.display = view.statusText ? 'block' : 'none';
+status.className = 'history-status' + (view.statusClass ? ' ' + view.statusClass : '');
+list.innerHTML = view.listHtml || '';
+pager.style.display = view.showPager ? 'flex' : 'none';
+document.getElementById('historyPageLabel').textContent = view.pagerLabel || '';
+document.getElementById('historyPrev').disabled = !!view.prevDisabled;
+document.getElementById('historyNext').disabled = !!view.nextDisabled;
+}
+
+async function loadHistory(page) {
+historyPage = page;
+paintHistory(describeHistoryView({ phase: 'loading' }));
+const idToken = getIdTokenSafe();
+if (!idToken) {
+paintHistory(describeHistoryView({ phase: 'error', code: 'expired' }));
+return;
+}
+const payload = buildHistoryRequest({ mode: PAGE_MODE, page: page, idToken: idToken });
+try {
+const response = await fetch(GAS_API_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'text/plain' },
+cache: 'no-store',
+body: JSON.stringify(payload)
+});
+const result = await response.json();
+if (!result || result.status !== 'success') {
+paintHistory(describeHistoryView({ phase: 'error', code: (result && result.code) || 'unavailable' }));
+return;
+}
+historyPage = result.page || page;
+paintHistory(describeHistoryView({
+phase: 'ready',
+mode: result.mode,
+label: result.label,
+page: result.page,
+pageSize: result.pageSize,
+total: result.total,
+items: result.items
+}));
+} catch (error) {
+paintHistory(describeHistoryView({ phase: 'error', code: 'network' }));
+}
+}
+
+document.getElementById('historyPrev').addEventListener('click', function() {
+if (historyPage <= 1) return;
+if (allowLocalFixture(location.hostname, urlParams.get('fixture'))) {
+historyPage -= 1;
+paintHistory(describeHistoryView(demoHistoryState(PAGE_MODE, historyPage)));
+return;
+}
+loadHistory(historyPage - 1);
+});
+
+document.getElementById('historyNext').addEventListener('click', function() {
+if (document.getElementById('historyNext').disabled) return;
+if (allowLocalFixture(location.hostname, urlParams.get('fixture'))) {
+historyPage += 1;
+paintHistory(describeHistoryView(demoHistoryState(PAGE_MODE, historyPage)));
+return;
+}
+loadHistory(historyPage + 1);
+});
 
 function liffUserPayload() {
 return {
